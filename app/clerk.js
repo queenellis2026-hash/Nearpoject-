@@ -32,8 +32,18 @@ function sumLineItemsCents(lineItems) {
 
 let invoiceCounter = 0;
 
-function createInvoice({ jobName, client, contractor, lineItems, changeOrders = [] }) {
+// The approved contract sum is set PER INVOICE, at creation, by the human
+// client — it is the ceiling the clerk checks against and the cap the
+// ledger/contract enforces at funding time. It is NOT a global and there
+// is no endpoint that sets it after the fact: a global "set approved sum"
+// route was the sharpest no-auth hole in the demo (any caller could raise
+// the ceiling to anything, which made "the clerk may never pay past it"
+// false even inside the app). The sum is committed with the invoice and
+// can only rise through a signed change order on that invoice.
+function createInvoice({ jobName, client, contractor, lineItems, changeOrders = [], approvedSumCents }) {
   if (!jobName) throw new Error('jobName is required');
+  const approved = Math.round(Number(approvedSumCents));
+  if (!Number.isFinite(approved) || approved <= 0) throw new Error('an invoice needs a positive approvedSumCents (the approved contract sum)');
   const baseCents = sumLineItemsCents(lineItems);
   const coCents = changeOrders.reduce((acc, co) => acc + Math.round(Number(co.amountCents) || 0), 0);
   invoiceCounter += 1;
@@ -47,20 +57,22 @@ function createInvoice({ jobName, client, contractor, lineItems, changeOrders = 
     baseCents,
     changeOrderCents: coCents,
     totalCents: baseCents + coCents,
+    approvedSumCents: approved,
     status: 'quoted', // quoted -> approved -> paid
     flagged: false,
     clerkCheck: null,
-    history: [{ at: 'now', event: 'created', detail: `invoice prepared by agent clerk, total $${(baseCents + coCents) / 100}` }],
+    history: [{ at: 'now', event: 'created', detail: `invoice prepared by agent clerk, total $${(baseCents + coCents) / 100}, approved contract sum $${approved / 100}` }],
   };
   return invoice;
 }
 
-// The clerk's core check: invoice total vs the approved contract sum.
-// Returns a check object and records it on the invoice. If the invoice
-// exceeds the approved sum it is FLAGGED and cannot be approved as-is.
-function checkAgainstApproved(invoice, approvedContractSumCents) {
-  const approved = Math.round(Number(approvedContractSumCents));
-  if (!Number.isFinite(approved) || approved < 0) throw new Error('approvedContractSumCents must be >= 0');
+// The clerk's core check: invoice total vs the invoice's own approved
+// contract sum. Returns a check object and records it on the invoice. If
+// the invoice exceeds the approved sum it is FLAGGED and cannot be
+// approved as-is.
+function checkAgainstApproved(invoice) {
+  const approved = invoice.approvedSumCents;
+  if (!Number.isFinite(approved) || approved < 0) throw new Error('invoice has no approvedSumCents to check against');
   const overageCents = invoice.totalCents - approved;
   const flagged = overageCents > 0;
   const check = {
@@ -78,22 +90,45 @@ function checkAgainstApproved(invoice, approvedContractSumCents) {
   return check;
 }
 
-// A human can approve a change order, which raises the approved contract
-// sum. After that the clerk re-checks; this is the honest way an overage
-// gets resolved (paper first, then money).
+// A human can approve a change order, which raises the invoice's
+// approved contract sum. After that the clerk re-checks; this is the
+// honest way an overage gets resolved (paper first, then money).
+//
+// The change order is AUTHORIZATION, not billing: it records that the
+// client agreed to the extra work and raises the invoice's approved sum,
+// but it does NOT add to the invoice total — the extra work is already
+// billed in the invoice's line items. Adding it here would double-count:
+// the total and the approved sum would rise by the same amount and the
+// overage could never clear. (A change order that adds genuinely new work
+// belongs in the line items of a new invoice, not here.)
+//
+// The approved sum lives ON the invoice (see createInvoice), so the raise
+// happens here — there is no global sum for a caller to bump.
+//
+// A change order changes the authorized sum, so — like a correction — it
+// invalidates any prior approval: the invoice goes back to 'quoted', the
+// approver is cleared, and the clerk check is cleared. Re-check and
+// re-approval are required before payment.
 function approveChangeOrder(invoice, changeOrder, approvedBy) {
   if (!approvedBy) throw new Error('a change order needs a human approver (approvedBy)');
   const co = { description: changeOrder.description || 'change order', amountCents: Math.round(Number(changeOrder.amountCents) || 0), approvedBy };
   invoice.changeOrders.push(co);
-  invoice.changeOrderCents += co.amountCents;
-  invoice.totalCents = invoice.baseCents + invoice.changeOrderCents;
-  invoice.history.push({ at: 'now', event: 'change-order-approved', detail: `${co.description}: +$${(co.amountCents / 100).toFixed(2)} approved by ${approvedBy}` });
+  invoice.approvedSumCents += co.amountCents;
+  invoice.status = 'quoted';
+  invoice.approvedBy = undefined;
+  invoice.clerkCheck = null;
+  invoice.history.push({ at: 'now', event: 'change-order-approved', detail: `${co.description}: +$${(co.amountCents / 100).toFixed(2)} approved by ${approvedBy} — approved sum rises to $${(invoice.approvedSumCents / 100).toFixed(2)}; prior approval void, re-check and re-approval required` });
   return invoice;
 }
 
 // Correct an invoice downward: remove/replace a line item total by issuing
 // a corrected invoice total. Used in the demo: the clerk flags $12,400
 // against a $12,000 approval; the human corrects the invoice to $12,000.
+//
+// A correction INVALIDATES any prior approval: the approval was for the
+// old total, so the invoice goes back to 'quoted', the approver is
+// cleared, and the clerk check is cleared — the invoice must be re-checked
+// and re-approved before it can be paid.
 function correctInvoiceTotal(invoice, correctedTotalCents, correctedBy, note) {
   if (!correctedBy) throw new Error('a correction needs a human (correctedBy)');
   const target = Math.round(Number(correctedTotalCents));
@@ -102,7 +137,10 @@ function correctInvoiceTotal(invoice, correctedTotalCents, correctedBy, note) {
   invoice.changeOrders.push({ description: note || 'human correction', amountCents: delta, approvedBy: correctedBy });
   invoice.changeOrderCents += delta;
   invoice.totalCents = target;
-  invoice.history.push({ at: 'now', event: 'corrected', detail: `total corrected to $${(target / 100).toFixed(2)} by ${correctedBy}` });
+  invoice.status = 'quoted';
+  invoice.approvedBy = undefined;
+  invoice.clerkCheck = null;
+  invoice.history.push({ at: 'now', event: 'corrected', detail: `total corrected to $${(target / 100).toFixed(2)} by ${correctedBy} — prior approval void, re-check and re-approval required` });
   return invoice;
 }
 

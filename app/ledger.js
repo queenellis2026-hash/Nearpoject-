@@ -1,7 +1,8 @@
 // ledger.js — a local simulation of the NEAR testnet escrow contract
 // (contract/src/contract.ts), with the same states and rules:
 //
-//   contract:  Created --approve_and_fund (deposit == amount)--> Funded
+//   contract:  Created --client_approve (recorded client only)--> Approved
+//              Approved --approve_and_fund (deposit == amount)--> Funded
 //              Funded  --release (by the client who funded)-----> Released
 //              Funded  --cancel  (by the client who funded)-----> Cancelled (refund)
 //
@@ -9,13 +10,22 @@
 // full flow with no wallet, no faucet, and no network. Amounts here are
 // integer cents (the desk app's unit); the on-chain contract uses
 // yoctoNEAR strings for the same amounts.
+//
+// THE GATE, mirrored: like the contract, this ledger requires the
+// recorded client's approval before funding — and the approval sets an
+// approved-sum CAP. fund() asserts the escrow was approved, the caller is
+// the recorded client, AND the invoice amount does not exceed the cap.
+// The clerk's flag and the human approval in the app are the workflow;
+// the approval state + cap here are the lock. Binding the client alone
+// would not make the approved-sum rule real — the cap is what makes "no
+// dollar moves past the approved sum" true in the simulation too.
 
 'use strict';
 
 class EscrowLedger {
   constructor() {
     this.balances = new Map(); // account -> cents (simulated test funds)
-    this.escrows = new Map(); // invoiceId -> { amountCents, client, contractor, status }
+    this.escrows = new Map(); // invoiceId -> { amountCents, client, contractor, status, approved, approvedSumCents }
   }
 
   // Test-funds faucet for the local simulation ONLY. On testnet this role
@@ -32,21 +42,47 @@ class EscrowLedger {
     return this.escrows.get(invoiceId) || null;
   }
 
-  // Mirrors contract create_invoice.
-  createEscrow(invoiceId, contractor, amountCents) {
+  // Mirrors contract create_invoice: the intended client is recorded at
+  // creation; only that account may approve, fund, release or cancel.
+  // The approved-sum cap starts unset (null) — only the recorded client
+  // can set it, via approve().
+  createEscrow(invoiceId, contractor, amountCents, client) {
     if (this.escrows.has(invoiceId)) throw new Error(`escrow ${invoiceId} already exists`);
-    this.escrows.set(invoiceId, { amountCents, client: null, contractor, status: 'Created' });
+    if (!client) throw new Error('an escrow needs a recorded client');
+    this.escrows.set(invoiceId, { amountCents, client, contractor, status: 'Created', approved: false, approvedSumCents: null });
     return this.escrows.get(invoiceId);
   }
 
-  // Mirrors contract approve_and_fund: the client attaches exactly the
-  // invoice amount; it moves from the client's balance into escrow.
+  // Mirrors contract client_approve: only the recorded client, only while
+  // the escrow is still Created (unfunded). The approval SETS the cap —
+  // the cap-setting is the approval, exactly as on-chain. The cap is the
+  // approved contract sum the clerk checked against.
+  approve(invoiceId, caller, approvedSumCents) {
+    const e = this._get(invoiceId);
+    if (e.status !== 'Created') throw new Error(`cannot approve escrow in status ${e.status}`);
+    if (caller !== e.client) throw new Error('only the recorded client can approve this escrow');
+    if (e.approved) throw new Error('escrow is already approved');
+    const cap = Math.round(Number(approvedSumCents));
+    if (!Number.isFinite(cap) || cap <= 0) throw new Error('approved sum must be positive');
+    e.approved = true;
+    e.approvedSumCents = cap;
+    return e;
+  }
+
+  // Mirrors contract approve_and_fund: the recorded client attaches
+  // exactly the invoice amount; it moves from the client's balance into
+  // escrow. Requires the client's prior approval AND that the invoice
+  // amount does not exceed the approved-sum cap — an unapproved escrow,
+  // or an invoice over the approved sum, cannot be funded, however the
+  // caller reaches this function.
   fund(invoiceId, client) {
     const e = this._get(invoiceId);
     if (e.status !== 'Created') throw new Error(`cannot fund escrow in status ${e.status}`);
+    if (!e.approved) throw new Error('escrow must be approved by the client before funding');
+    if (client !== e.client) throw new Error('only the recorded client can fund this escrow');
+    if (e.amountCents > e.approvedSumCents) throw new Error('invoice amount exceeds the approved sum');
     if (this.balanceOf(client) < e.amountCents) throw new Error('insufficient simulated balance to fund escrow');
     this.balances.set(client, this.balanceOf(client) - e.amountCents);
-    e.client = client;
     e.status = 'Funded';
     return e;
   }

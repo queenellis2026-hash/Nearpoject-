@@ -15,6 +15,13 @@
   .status { font-weight: 700; text-transform: uppercase; }
   pre { background: #f6f6f6; padding: .6rem; overflow-x: auto; font-size: .85em; }
   .actor-agent { color: #6a1b9a; font-weight: 600; } .actor-human { color: #1565c0; font-weight: 600; }
+  .paid-banner { background: #e8f6ec; border: 2px solid #2a7; padding: 1rem; border-radius: 8px; font-size: 1.35em; font-weight: 700; line-height: 1.4; }
+  .funded-banner { background: #eef4ff; border: 2px solid #1565c0; padding: 1rem; border-radius: 8px; font-size: 1.2em; font-weight: 700; line-height: 1.4; }
+  .history { font-size: .8em; color: #555; }
+  .history summary { cursor: pointer; font-weight: 600; color: #333; }
+  .explorer { font-size: .85em; color: #555; margin-top: 1rem; }
+  .explorer a { color: #1565c0; }
+  .explorer code { font-size: .9em; }
 </style>
 </head>
 <body>
@@ -27,7 +34,7 @@
   <p>The homeowner and the crew agreed a contract sum up front. The clerk may never pay past it.</p>
   <label>Approved contract sum (USD) <input id="contractSum" type="number" value="12000"></label>
   <button onclick="setSum()">Set approved sum</button>
-  <span id="sumOut"></span>
+  <div id="sumOut"></div>
 </section>
 
 <section>
@@ -49,24 +56,52 @@
      order that raises the approved sum. The clerk then re-checks. Nothing is payable before a human approves.</p>
   <label>Corrected invoice total (USD) <input id="correctedTotal" type="number" value="12000"></label>
   <button onclick="correct()">Human: correct invoice to this total</button>
+  <label>Change order — description <input id="coDesc" value="Drain reroute — approved as extra work"></label>
+  <label>Change order — amount (USD) <input id="coAmount" type="number" value="400"></label>
+  <button onclick="changeOrder()">Human: approve change order</button>
   <label>Your name (the human approver) <input id="approver" value="Chris (homeowner's rep)"></label>
   <button onclick="approve()">Human: approve for payment</button>
   <div id="approveOut"></div>
 </section>
 
 <section>
-  <h2>4. Payment — escrow release on NEAR (simulated locally)</h2>
+  <h2>4. Payment — escrow on NEAR (simulated locally)</h2>
+  <p>Two steps, as on-chain: first the approved invoice is <b>funded</b> into escrow, then the
+     funding client <b>releases</b> it to the crew. The escrow contract enforces the same
+     order on NEAR testnet — funding requires the client's approval first.</p>
+  <button onclick="fund()">Fund escrow</button>
   <button onclick="pay()">Release payment from escrow</button>
+  <div id="fundOut"></div>
   <div id="payOut"></div>
   <h3>NEAR Intents — live DRY settlement quote (no funds move)</h3>
   <p>What would this invoice settle to in USDT if the homeowner paid cross-chain? Quoted live from the NEAR Intents 1Click API with <code>dry: true</code>.</p>
   <label>Amount (NEAR) <input id="quoteAmt" type="number" value="1"></label>
   <button onclick="quote()">Get dry quote</button>
   <pre id="quoteOut">—</pre>
+  <p class="explorer">Escrow contract live on NEAR testnet: <a href="https://explorer.testnet.near.org/accounts/paid-in-full-v2.testnet" target="_blank" rel="noopener">paid-in-full-v2.testnet</a><br>
+  Deploy transaction: <a href="https://explorer.testnet.near.org/transactions/CLzB1jES9NcS43DMPd9TYTrQfi8T55DeXosfg3nKYCoH" target="_blank" rel="noopener"><code>CLzB1jES9NcS43DMPd9TYTrQfi8T55DeXosfg3nKYCoH</code></a><br>
+  Code hash: <code>9iHW5xy1jvLKEowgy1tA1jU4zvtofpYgoY9W4oVKM6G8</code><br>
+  The demo above is a local simulation of that contract — same states, same rules, no real funds.</p>
+</section>
+
+<section>
+  <h2>5. Live on-chain state — the real contract, read from NEAR testnet</h2>
+  <p>The payment above is simulated. The contract is not: this reads the live invoice
+     state straight off the deployed contract (<code>paid-in-full-v2.testnet</code>) through
+     the testnet RPC — the same invoices the on-chain proof ran on (inv-2001 released,
+     inv-2002 and inv-2003 still Created, over the approved sum). No keys, no signing,
+     read-only.</p>
+  <button onclick="onchain()">Show live on-chain invoices</button>
+  <div id="onchainOut"></div>
 </section>
 
 <script>
 let currentId = null;
+// The approved contract sum the human set in section 1. It is committed
+// to the server only when the invoice is created (POST /api/invoices) —
+// there is no "set the ceiling" endpoint to call, by design: a global
+// setter let any caller raise the ceiling to anything.
+let approvedSumCents = 12000_00;
 const $ = (id) => document.getElementById(id);
 async function api(method, path, body) {
   const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
@@ -83,17 +118,18 @@ function renderInvoice(inv) {
     `<p>Status: <span class="status">${inv.status}</span></p>`;
 }
 async function setSum() {
-  const cents = Math.round(Number($('contractSum').value) * 100);
-  const out = await api('POST', '/api/contract-sum', { approvedContractSumCents: cents });
-  $('sumOut').textContent = 'Approved sum set: ' + money(out.approvedContractSumCents);
+  // Client-side only: records the human's approved sum and shows the
+  // confirmation. The sum is committed to the server with the invoice
+  // (createInvoice), not through a setter endpoint.
+  approvedSumCents = Math.round(Number($('contractSum').value) * 100);
+  $('sumOut').innerHTML = '<p class="ok">Approved contract sum confirmed: ' + money(approvedSumCents) + '</p>';
 }
 async function createInvoice() {
-  await setSum();
   const items = ['li1','li2','li3'].map(id => {
     const [description, qty, price] = $(id).value.split('|').map(s => s.trim());
     return { description, qty: Number(qty), unitPriceCents: Math.round(Number(price) * 100) };
   });
-  const inv = await api('POST', '/api/invoices', { jobName: $('jobName').value, client: 'homeowner', contractor: 'gulf-coast-crew', lineItems: items });
+  const inv = await api('POST', '/api/invoices', { jobName: $('jobName').value, client: 'homeowner', contractor: 'gulf-coast-crew', lineItems: items, approvedSumCents });
   renderInvoice(inv);
   $('checkOut').innerHTML = '';
 }
@@ -110,25 +146,53 @@ async function correct() {
   renderInvoice(invoice);
   $('checkOut').innerHTML = `<p class="${check.flagged ? 'flag' : 'ok'}">After correction — ${check.verdict}</p>`;
 }
+async function changeOrder() {
+  const { invoice, check } = await api('POST', '/api/change-order', {
+    invoiceId: currentId,
+    changeOrder: { description: $('coDesc').value, amountCents: Math.round(Number($('coAmount').value) * 100) },
+    approvedBy: $('approver').value });
+  renderInvoice(invoice);
+  $('checkOut').innerHTML = `<p class="${check.flagged ? 'flag' : 'ok'}">After change order — ${check.verdict}</p>`;
+}
 async function approve() {
   try {
     const inv = await api('POST', '/api/approve', { invoiceId: currentId, approvedBy: $('approver').value });
     renderInvoice(inv);
-    $('approveOut').innerHTML = `<p class="ok">Approved by ${inv.approvedBy}. The escrow can now be released.</p>`;
+    $('approveOut').innerHTML = `<p class="ok">Approved by ${inv.approvedBy}. The escrow can now be funded.</p>`;
   } catch (e) { $('approveOut').innerHTML = `<p class="flag">${e.message}</p>`; }
+}
+async function fund() {
+  try {
+    const out = await api('POST', '/api/fund', { invoiceId: currentId });
+    renderInvoice(out.invoice);
+    $('fundOut').innerHTML = `<p class="funded-banner">FUNDED. Escrow status: ${out.escrow.status}. ${money(out.escrow.amountCents)} held in escrow (simulated test funds).</p>`;
+  } catch (e) { $('fundOut').innerHTML = `<p class="flag">${e.message}</p>`; }
 }
 async function pay() {
   try {
-    const out = await api('POST', '/api/pay', { invoiceId: currentId });
+    const out = await api('POST', '/api/release', { invoiceId: currentId });
     renderInvoice(out.invoice);
-    $('payOut').innerHTML = `<p class="ok">PAID. Escrow status: ${out.escrow.status}. Crew balance: ${money(out.balances.crew)} (simulated test funds).</p>` +
-      '<pre>' + out.invoice.history.map(h => h.event + ' — ' + h.detail).join('\n') + '</pre>';
+    $('payOut').innerHTML = `<p class="paid-banner">PAID. Escrow status: ${out.escrow.status}. Crew balance: ${money(out.balances.crew)} (simulated test funds).</p>` +
+      '<details class="history" open><summary>Event history</summary><pre>' + out.invoice.history.map(h => h.event + ' — ' + h.detail).join('\n') + '</pre></details>';
   } catch (e) { $('payOut').innerHTML = `<p class="flag">${e.message}</p>`; }
 }
 async function quote() {
   $('quoteOut').textContent = 'Fetching live dry quote…';
   try { $('quoteOut').textContent = JSON.stringify(await api('GET', '/api/quote?amountNear=' + $('quoteAmt').value), null, 2); }
   catch (e) { $('quoteOut').textContent = e.message; }
+}
+function nearAmt(yocto) { return (Number(yocto) / 1e24).toFixed(4) + ' NEAR'; }
+async function onchain() {
+  $('onchainOut').innerHTML = '<p>Reading live state from NEAR testnet…</p>';
+  try {
+    const data = await api('GET', '/api/onchain');
+    $('onchainOut').innerHTML =
+      '<p>Contract: <a href="' + data.accountUrl + '" target="_blank" rel="noopener"><code>' + data.contract + '</code></a> — live on NEAR testnet</p>' +
+      '<table><tr><th>Invoice</th><th>Status</th><th>Approved</th><th>Cap</th><th>Amount</th></tr>' +
+      data.invoices.map(inv =>
+        `<tr><td>${inv.id}</td><td><span class="status">${inv.status}</span></td><td>${inv.approved ? 'yes' : 'no'}</td><td>${nearAmt(inv.approvedSumYocto)}</td><td>${nearAmt(inv.amountYocto)}</td></tr>`).join('') +
+      '</table><p class="explorer">Read live from the testnet RPC — the same invoices the on-chain proof ran on. inv-2001 was released to the contractor; inv-2002 and inv-2003 are still Created because their amounts sit over the approved sum.</p>';
+  } catch (e) { $('onchainOut').innerHTML = '<p class="err">Live on-chain state unavailable: ' + e.message + '</p>'; }
 }
 </script>
 </body>

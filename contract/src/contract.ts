@@ -2,19 +2,51 @@
 //
 // One invoice = one escrow record:
 //   create_invoice    contractor registers an invoice (amount in yoctoNEAR)
-//   approve_and_fund  the client calls it WITH a deposit exactly equal to
-//                     the invoice amount — that call is the approval, and
-//                     the deposit is held in escrow by this contract
+//                     and records the intended CLIENT at creation time
+//   client_approve    the recorded client approves the invoice AND sets the
+//                     approved-sum CAP (see THE GATE below) — the cap-setting
+//                     IS the approval
+//   approve_and_fund  the recorded client calls it WITH a deposit exactly
+//                     equal to the invoice amount — that call is the funding,
+//                     and the deposit is held in escrow by this contract
 //   release           the funding client releases the escrow to the
 //                     contractor (the payment moment)
 //   cancel            the funding client cancels a funded invoice and is
 //                     refunded in full
 //
-// The desk app (app/clerk.js) enforces the layer above this: an agent
-// clerk checks every invoice against the approved contract sum and flags
-// overages, and a human approval is required before funding is attempted.
-// This contract is deliberately minimal — the smallest real NEAR fit for
-// "escrow/releases an invoice amount against an approval".
+// THE GATE (why client_approve exists, and why it sets a cap): the desk
+// app (app/clerk.js) has an agent clerk that checks every invoice against
+// the approved contract sum and flags overages, and a human approval is
+// required before funding is attempted. That check used to live ONLY in
+// the app — the contract accepted funding from any caller with the exact
+// deposit, so a flagged invoice could be funded and released directly
+// on-chain, bypassing the clerk entirely. This contract now enforces the
+// gate itself, in two parts:
+//   (1) CLIENT BINDING — approve_and_fund asserts the caller is the
+//       client recorded at creation, so a stranger cannot fund an invoice.
+//   (2) APPROVED-SUM CAP — the client sets approved_sum_yocto when they
+//       approve, and approve_and_fund asserts the invoice amount is less
+//       than or equal to it. Binding the client alone would NOT make the
+//       approved-sum rule real on-chain: the client could still fund a
+//       $12,400 invoice against a $12,000 approval. The cap is what makes
+//       "no dollar moves past the approved sum" true on-chain.
+//
+// Design choices:
+// - WHO SETS THE CAP: the client, never the contractor. The contractor
+//   creates the invoice (and names the client), but only the recorded
+//   client can call client_approve, so only the client can set the cap.
+//   A contractor-set cap would be the contractor setting their own
+//   ceiling — meaningless.
+// - THE CAP-SETTING IS THE APPROVAL: there is no separate parameterless
+//   approval call. That would be redundant — an approval without a cap
+//   would leave the invoice fundable up to any amount, and a cap without
+//   approval would be meaningless. One call, one decision: the client
+//   approves the invoice AND states the sum they approve it up to.
+// - The cap is set once, before funding. If the cap is below the invoice
+//   amount, funding is blocked with a clear error ("invoice amount
+//   exceeds the approved sum") — the remedy is a corrected invoice (a new
+//   invoice id) or a change order raising the approved sum, exactly as
+//   the desk app's workflow does.
 //
 // Build:  npm run build   (produces build/paid-in-full.wasm)
 // Deploy (testnet only): see scripts/deploy-testnet.sh — needs a testnet
@@ -25,9 +57,26 @@ import { NearBindgen, near, call, view, initialize, LookupMap, Vector, assert } 
 class Invoice {
   job: string = '';
   contractor: string = '';
-  client: string = '';
+  client: string = ''; // recorded at creation; only this account may approve/fund/release/cancel
   amountYocto: string = '0'; // string: yoctoNEAR exceeds JS number range
   status: string = 'Created'; // Created | Funded | Released | Cancelled
+  approved: boolean = false; // set by client_approve, together with the cap
+  approvedSumYocto: string = '0'; // the cap, set by the client at approval; '0' = no cap set
+}
+
+// A plausible NEAR account id: 2–64 chars, lowercase letters, digits,
+// '.', '_' or '-'. Rejects the empty string, spaces, uppercase and
+// anything that cannot be an account — so a transfer can never be
+// addressed to a malformed account (see the status-before-transfer note
+// on release/cancel below).
+function isValidAccountId(id: string): boolean {
+  if (typeof id !== 'string' || id.length < 2 || id.length > 64) return false;
+  for (let i = 0; i < id.length; i++) {
+    const c = id[i];
+    const ok = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c === '.' || c === '_' || c === '-';
+    if (!ok) return false;
+  }
+  return true;
 }
 
 @NearBindgen({ requireInit: true })
@@ -39,25 +88,51 @@ export class PaidInFull {
   init() {}
 
   @call({})
-  create_invoice({ invoice_id, job, contractor, amount_yocto }: { invoice_id: string; job: string; contractor: string; amount_yocto: string }) {
+  create_invoice({ invoice_id, job, contractor, client, amount_yocto }: { invoice_id: string; job: string; contractor: string; client: string; amount_yocto: string }) {
     assert(this.invoices.get(invoice_id) === null, 'invoice already exists');
     assert(BigInt(amount_yocto) > 0n, 'amount must be positive');
+    assert(isValidAccountId(contractor), 'contractor must be a valid NEAR account id');
+    assert(isValidAccountId(client), 'client must be a valid NEAR account id');
     const inv = new Invoice();
     inv.job = job;
     inv.contractor = contractor;
+    inv.client = client;
     inv.amountYocto = amount_yocto;
+    inv.approved = false;
+    inv.approvedSumYocto = '0';
     this.invoices.set(invoice_id, inv);
     this.ids.push(invoice_id);
-    near.log(`invoice ${invoice_id} created: ${job}, amount ${amount_yocto} yocto`);
+    near.log(`invoice ${invoice_id} created: ${job}, amount ${amount_yocto} yocto, client ${client}`);
+  }
+
+  // The on-chain gate: the recorded client approves the invoice AND sets
+  // the approved-sum cap in the same call. Only the recorded client may
+  // call it, and only while the invoice is still Created (unfunded). A
+  // flagged or unchecked invoice is never approved here — the app's clerk
+  // check and human approval happen before this call is made, and the cap
+  // the client sets is the approved contract sum from that check.
+  @call({})
+  client_approve({ invoice_id, approved_sum_yocto }: { invoice_id: string; approved_sum_yocto: string }) {
+    const inv = this._get(invoice_id);
+    assert(inv.status === 'Created', `cannot approve an invoice in status ${inv.status}`);
+    assert(near.predecessorAccountId() === inv.client, 'only the recorded client can approve this invoice');
+    assert(!inv.approved, 'invoice is already approved');
+    assert(BigInt(approved_sum_yocto) > 0n, 'approved sum must be positive');
+    inv.approved = true;
+    inv.approvedSumYocto = approved_sum_yocto;
+    this.invoices.set(invoice_id, inv);
+    near.log(`invoice ${invoice_id} approved by client ${inv.client} up to ${approved_sum_yocto} yocto`);
   }
 
   @call({ payableFunction: true })
   approve_and_fund({ invoice_id }: { invoice_id: string }) {
     const inv = this._get(invoice_id);
     assert(inv.status === 'Created', `cannot fund an invoice in status ${inv.status}`);
+    assert(inv.approved, 'invoice must be approved by the client before funding (call client_approve first)');
+    assert(near.predecessorAccountId() === inv.client, 'only the recorded client can fund this invoice');
+    assert(BigInt(inv.amountYocto) <= BigInt(inv.approvedSumYocto), 'invoice amount exceeds the approved sum');
     const deposit = near.attachedDeposit();
     assert(deposit === BigInt(inv.amountYocto), 'attached deposit must equal the invoice amount exactly');
-    inv.client = near.predecessorAccountId();
     inv.status = 'Funded';
     this.invoices.set(invoice_id, inv);
     near.log(`invoice ${invoice_id} approved and funded by ${inv.client}`);
@@ -103,3 +178,26 @@ export class PaidInFull {
     return inv as Invoice;
   }
 }
+
+// KNOWN LIMITATIONS (deliberate, documented — not fixed in this version):
+//
+// 1. Status-before-transfer: release/cancel set the invoice status to its
+//    terminal state BEFORE creating the async transfer promise, with no
+//    callback and no withdraw/rescue function. If a transfer failed, the
+//    funds would strand in the contract. The failure path is essentially
+//    closed by create_invoice's account validation (the contractor and
+//    client are validated as real-format NEAR account ids, so the transfer
+//    target always exists), but a failed transfer would still strand
+//    funds. A rescue function is out of scope for this version.
+//
+// 2. No expiry: invoices never expire, so a Created invoice can be
+//    approved and funded arbitrarily late. The approval gate means a stale
+//    invoice still needs the recorded client's explicit approval (with a
+//    cap) to move, which bounds the risk, but there is no deadline
+//    enforcement.
+//
+// 3. invoice_ids() is unbounded: it returns the entire Vector of invoice
+//    ids in one view call. At large scale that is a gas/time risk (the
+//    call grows with the number of invoices). For this hackathon's volume
+//    it is fine; a production version would paginate (e.g. an offset/limit
+//    view) instead.

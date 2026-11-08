@@ -15,9 +15,9 @@ A small contractor finishes a job and sends an invoice. Two things go wrong in r
 
 - An **agent clerk** prepares the invoice from the job's line items and change orders.
 - The clerk **checks the invoice total against the approved contract sum** and **flags any overage** — before a dollar moves.
-- A flagged invoice **cannot be approved or paid** until a human resolves the overage (correct the invoice, or sign a change order that raises the approved sum).
+- A flagged invoice **cannot be approved or paid** until a human resolves the overage (correct the invoice, or sign a change order that raises the approved sum). The demo app blocks it at the clerk, and the contract enforces it on-chain: the client approves with an approved-sum cap, and funding fails if the invoice amount exceeds that cap.
 - A **human approval** is required before the payment state can change. The clerk cannot approve its own invoice.
-- Payment runs through a **NEAR testnet escrow contract**: the client's approval *is* the funding call (exact deposit), and the funds release to the contractor only on the client's release.
+- Payment runs through a **NEAR testnet escrow contract**: the recorded client approves the invoice and sets the approved-sum cap; the approval is the funding call (exact deposit, and the invoice amount must be at or under the cap), and the funds release to the contractor only on the client's release.
 - A **NEAR Intents dry quote** (`dry: true` — no funds move) shows what the payment would settle to in USDT if it were paid cross-chain.
 
 ## Try it — do X, see Y
@@ -45,7 +45,7 @@ The API the page uses is documented by the endpoints in `app/server.js` (`/api/i
 
 | NEAR technology | Where | What it does here |
 |---|---|---|
-| **NEAR smart contract (testnet design)** | `contract/src/contract.ts`, compiled to `contract/build/paid-in-full.wasm` | Escrows one invoice amount per invoice. `approve_and_fund` takes a deposit exactly equal to the invoice amount — the deposit *is* the approval — and `release` pays the contractor; `cancel` refunds the client. Only the funding client can release or cancel. |
+| **NEAR smart contract (testnet design)** | `contract/src/contract.ts`, compiled to `contract/build/paid-in-full.wasm` | Escrows one invoice amount per invoice. The contractor registers the invoice and records the intended client; the recorded client approves it and sets the approved-sum cap in one call (`client_approve`); `approve_and_fund` takes a deposit exactly equal to the invoice amount, asserts the caller is the recorded client, and asserts the amount is at or under the cap — so no dollar moves past the approved sum. `release` pays the contractor; `cancel` refunds the client. Only the funding client can release or cancel. |
 | **near-sdk-js 2.0.0** | `contract/` | The contract SDK. `cd contract && npm run build` reproduces the Wasm. |
 | **NEAR Intents (1Click API)** | `intents/quote.js` | Dry quotes only: `dry: true` returns a signed settlement quote (verified live: 1 NEAR → 3.622149 USDT, Nov 8, 2026) with no deposit address issued and no funds moved. No JWT/partner registration used (Q-006: it only lowers the fee). |
 | **NEAR testnet** | `contract/scripts/deploy-testnet.sh` | The deploy path for the contract. Testnet-only projects are eligible in all tracks (Q-010); no mandatory integration applies (Q-011). |
@@ -56,8 +56,9 @@ The API the page uses is documented by the endpoints in `app/server.js` (`/api/i
 |---|---|
 | Agent clerk logic (prepare, check, flag, human gate) | **Real and running** — `app/clerk.js`, covered by tests, exercised by the demo UI. |
 | Demo app + UI | **Real and running** — zero-dependency Node server, `app/server.js`. |
-| Escrow flow in the demo | **Local simulation** — `app/ledger.js` mirrors the contract's states and rules 1:1 (Created → Funded → Released/Cancelled, exact-amount funding, client-only release) so judges can run it with no wallet or faucet. |
-| The NEAR contract itself | **Real code, deployed and proven on testnet** — TypeScript source compiles to a 539,586-byte Wasm exporting all 7 methods, deployed to `paid-in-full.testnet` (tx `FFLd5A7dud5FmghMLCAfZuBvFZwPrQyPrbrg88ShgyXf`, code hash `5CzGbR7KbWsjqarxYaSKHBSgTwz4rZxNDP9KHBpz6ayC`); the full escrow loop was proven on chain (create_invoice → approve_and_fund → release). See `DEPLOY.md`. |
+| Escrow flow in the demo | **Local simulation** — `app/ledger.js` mirrors the contract's states and rules 1:1 (Created → Approved → Funded → Released/Cancelled, client-only approval with an approved-sum cap, exact-amount funding, client-only release) so judges can run it with no wallet or faucet. |
+| The NEAR contract itself | **Real code, deployed and proven on testnet** — TypeScript source compiles to a 541,471-byte Wasm exporting all 8 methods, deployed to the fresh account `paid-in-full-v2.testnet` (deploy tx `CLzB1jES9NcS43DMPd9TYTrQfi8T55DeXosfg3nKYCoH`, code hash `9iHW5xy1jvLKEowgy1tA1jU4zvtofpYgoY9W4oVKM6G8`); the full escrow loop was proven on chain with the new gate using two distinct accounts (create_invoice → client_approve with cap → approve_and_fund → release), the cap was proven too (a 0.0124 NEAR invoice approved with a 0.01 NEAR cap cannot be funded), and eight denial checks passed on-chain (fund without approval, stranger approve/fund/release, wrong-amount fund, double-fund, double-release). See `DEPLOY.md`. |
+| Live on-chain state in the demo | **Real, live, read-only** — section 5 of the desk ("Show live on-chain invoices") reads the deployed contract's live invoice state straight from the testnet RPC (`GET /api/onchain`, `app/onchain.js`); the demo's payment is simulated, but the invoice table it shows is the real contract's, refreshed from the RPC every 60 s. No keys, no signing, no writes. |
 | NEAR Intents | **Real, live, dry-only** — quotes are fetched from the production 1Click API with `dry: true`. No deposit address is ever requested; no funds can move. |
 | Money | **No real money anywhere.** No mainnet account, no mainnet deploy, no real transaction of any kind. Simulated balances are test numbers in a local process. |
 
@@ -66,11 +67,13 @@ The API the page uses is documented by the endpoints in `app/server.js` (`/api/i
 ```
 app/clerk.js            the agent clerk: totals, approved-sum check, FLAG, human gate
 app/ledger.js           local escrow simulation mirroring the contract
+app/onchain.js          read-only testnet RPC views of the deployed contract (GET /api/onchain)
 app/server.js           zero-dependency demo server + JSON API
 app/public/index.html   the desk UI (purple = agent acts, blue = human acts)
 contract/src/contract.ts  the NEAR testnet escrow contract (near-sdk-js)
 contract/scripts/       testnet deploy script (refuses non-testnet accounts)
 contract/tests-sandbox/ sandbox integration test for the compiled Wasm
+scripts/onchain-proof-v2.sh  on-chain proof script (fresh account, denials)
 intents/quote.js        NEAR Intents dry-quote client (+ CLI: npm run quote)
 tests/                  unit tests: npm test
 demo/demo-script.md     60–90s demo video script, storyboard, screenshot list

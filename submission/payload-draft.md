@@ -30,12 +30,12 @@ Team size is drafted as `2 - 4` (Chris + the agents working under his direction)
   "nearAddress": "[MAINNET NEAR PAYOUT ADDRESS]",
   "projectUrl": "[PUBLIC REPO URL]",
   "demoUrl": "[X POST URL]",
-  "idea": "Contractors lose money in the gap between finishing a job and getting paid, and invoices quietly grow past the price the customer approved. Paid in Full is an invoice-to-payment desk for small crews. An agent clerk prepares the invoice from the job's line items, checks it against the approved contract sum, and flags any overage before a dollar moves; a flagged invoice cannot be approved or paid until a human resolves it, and a human approval is required before any payment. On NEAR: a testnet escrow contract holds the approved amount (the funding call takes the exact deposit as the approval) and releases it to the contractor on the client's release, and NEAR Intents dry quotes (dry: true, no funds moved) show what the payment would settle to cross-chain. The local demo runs with no wallet: npm test, then ./run-demo.sh. Built November 8-14, 2026 for NEAR HACKATHON. Tracks: realworld (invoicing on crypto rails), business (payments within human-set limits), agents (an agent that prepares and checks, a human who decides).",
+  "idea": "Contractors lose money in the gap between finishing a job and getting paid, and invoices quietly grow past the price the customer approved. Paid in Full is an invoice-to-payment desk for small crews. An agent clerk prepares the invoice from the job's line items, checks it against the approved contract sum, and flags any overage before a dollar moves; a flagged invoice cannot be approved or paid until a human resolves it, and a human approval is required before any payment. On NEAR: a testnet escrow contract records the client at invoice creation; only that client can approve, and approval sets an approved-sum cap — funding then requires the approval, the recorded client, and a deposit exactly equal to the invoice amount and at or under the cap, and releases to the contractor only on the client's release. NEAR Intents dry quotes (dry: true, no funds moved) show what the payment would settle to cross-chain. The local demo runs with no wallet: npm test, then ./run-demo.sh. Built November 8-14, 2026 for NEAR HACKATHON. Tracks: realworld (invoicing on crypto rails), business (payments within human-set limits), agents (an agent that prepares and checks, a human who decides).",
   "consent": true
 }
 ```
 
-The `idea` text above is 1,032 characters (rule: 20–2,000) and describes only what the build actually does.
+The `idea` text above is 1,187 characters (rule: 20–2,000) and describes only what the build actually does.
 
 ## Before sending — checklist
 

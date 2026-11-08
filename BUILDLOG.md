@@ -56,3 +56,12 @@ Per the plan, if the contract work is clearly slipping by **end of day Nov 11**,
 3. Record the demo video per `demo/demo-script.md`; capture the 7 screenshots.
 4. Make the repository public (human step) and fill `[PUBLIC REPO URL]`.
 5. Chris's steps (his alone): create the mainnet NEAR payout account, publish the X post, confirm the payload, send the submission — all before **Nov 14, 5:59 PM CST**. Keep any hosted demo up through Nov 25 per Q-012 guidance.
+
+## Nov 8 evening — v2 fix pass (addendum)
+
+- **B4 CLOSED:** the contract deployed to testnet — first to `paid-in-full.testnet` (tx `ARxLv79u…`, superseded), then to a FRESH account `paid-in-full-v2.testnet` (tx `CLzB1jES9NcS43DMPd9TYTrQfi8T55DeXosfg3nKYCoH`, code hash `9iHW5xy1…`, Wasm 541,471 B). Full record: `DEPLOY.md`.
+- **Approval-gate fix:** `contract.ts` records the client at creation; `client_approve` (client-only) sets the approved-sum cap; `approve_and_fund` requires approval + recorded client + exact amount at/under cap. Proven on-chain with two accounts plus stranger denials; cap proven (0.0124 NEAR invoice, 0.01 NEAR cap, funding rejected).
+- **Sandbox test:** `contract/tests-sandbox/run.mjs` needed a one-line near-workspaces v4 fix (`crew.balance()`); ran and passed on the build server (exit 0). Still cannot run on the restricted VM (fd limit).
+- **`POST /api/contract-sum` removed** — no global sum endpoint; the sum is per-invoice at creation, raisable only via signed change order. Demo reads live on-chain state via `app/onchain.js` (read-only RPC).
+- **Video v4** (104.1 s, 1920x1080): live on-chain tail in beat 6, closing narration re-recorded, outro points at the v2 account. Narration pronunciation fixes applied by rewording, NOT verified by ear — the re-review listens.
+- **Submission payload draft** updated to describe the gate (approval + cap), not the old "funding is the approval" wording. Placeholders (lead name, email, payout address, repo URL, X post URL) still Chris's alone.
