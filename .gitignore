@@ -1,0 +1,7 @@
+node_modules/
+contract/node_modules/
+contract/build/*.js
+contract/build/*.map
+contract/build/*.c
+contract/build/*.h
+*.log

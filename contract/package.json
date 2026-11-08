@@ -1,0 +1,1 @@
+{"dependencies":{"near-sdk-js":"2.0.0"},"license":"MIT","name":"paid-in-full-contract","private":true,"scripts":{"build":"near-sdk-js build src/contract.ts build/paid-in-full.wasm","deploy:testnet":"bash scripts/deploy-testnet.sh"},"version":"0.1.0","devDependencies":{"@types/node":"^18.19.0","near-workspaces":"^4.0.0"}}
