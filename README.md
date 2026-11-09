@@ -15,9 +15,9 @@ A small contractor finishes a job and sends an invoice. Two things go wrong in r
 
 - An **agent clerk** prepares the invoice from the job's line items and change orders.
 - The clerk **checks the invoice total against the approved contract sum** and **flags any overage** — before a dollar moves.
-- A flagged invoice **cannot be approved or paid** until a human resolves the overage (correct the invoice, or sign a change order that raises the approved sum). The demo app blocks it at the clerk, and the contract enforces it on-chain: the client approves with an approved-sum cap, and funding fails if the invoice amount exceeds that cap.
+- A flagged invoice **cannot be approved or paid** until a human resolves the overage (correct the invoice, or sign a change order that raises the approved sum — before approval; once the client approves, the approved sum is frozen and only a new invoice can change it). The demo app blocks it at the clerk, and the contract enforces it on-chain: the client approves with an approved-sum cap, and funding fails if the invoice amount exceeds that cap.
 - A **human approval** is required before the payment state can change. The clerk cannot approve its own invoice.
-- Payment runs through a **NEAR testnet escrow contract**: the recorded client approves the invoice and sets the approved-sum cap; the approval is the funding call (exact deposit, and the invoice amount must be at or under the cap), and the funds release to the contractor only on the client's release.
+- Payment runs through a **NEAR testnet escrow contract**: the recorded client approves the invoice and sets the approved-sum cap; a separate funding call (`approve_and_fund`) attaches a deposit exactly equal to the invoice amount, and the invoice amount must be at or under the cap; the funds release to the contractor only on the client's release.
 - A **NEAR Intents dry quote** (`dry: true` — no funds move) shows what the payment would settle to in USDT if it were paid cross-chain.
 
 ## Try it — do X, see Y
@@ -25,7 +25,7 @@ A small contractor finishes a job and sends an invoice. Two things go wrong in r
 You need Node.js 18+. No wallet, no account, no install step for the demo (zero dependencies).
 
 1. **Do:** `npm test`
-   **See:** 9 passing tests covering the clerk's flag, the human-approval gate, corrections, change orders, and the escrow fund/release/refund paths.
+   **See:** 20 passing tests covering the clerk's flag, the human-approval gate, corrections, change orders, and the escrow fund/release/refund paths.
 2. **Do:** `./run-demo.sh` and open http://localhost:3737
    **See:** the desk, pre-filled with the demo job: a bathroom remodel, approved contract sum **$12,000**.
 3. **Do:** click **"Clerk: prepare invoice"**, then **"Clerk: check against approved sum"**.
@@ -34,12 +34,14 @@ You need Node.js 18+. No wallet, no account, no install step for the demo (zero 
    **See:** refusal — a flagged invoice cannot be approved.
 5. **Do:** leave the corrected total at $12,000 and click **"Human: correct invoice to this total"**, then **"Human: approve for payment"**.
    **See:** the clerk re-checks (OK, within the approved sum), the invoice moves to **approved**.
-6. **Do:** click **"Release payment from escrow"**.
-   **See:** the invoice becomes **paid**, the escrow shows **Released**, and the crew's (simulated) balance is $12,000. The full event history — created, flagged, corrected, approved, paid — is printed under the result.
-7. **Do (optional, needs network):** click **"Get dry quote"**.
+6. **Do:** click **"Fund escrow"**.
+   **See:** the escrow shows **Funded** — the approved $12,000 has moved into escrow (the client's simulated balance drops by $12,000; the crew is not paid yet).
+7. **Do:** click **"Release payment from escrow"**.
+   **See:** the invoice becomes **paid**, the escrow shows **Released**, and the crew's (simulated) balance is $12,000. The full event history — created, flagged, corrected, approved, funded, paid — is printed under the result.
+8. **Do (optional, needs network):** click **"Get dry quote"**.
    **See:** a live NEAR Intents 1Click quote (`dry: true`) for settling NEAR → USDT. Or run `npm run quote -- 2.5` in a terminal.
 
-The API the page uses is documented by the endpoints in `app/server.js` (`/api/invoices`, `/api/check`, `/api/correct`, `/api/approve`, `/api/pay`, `/api/quote`).
+The API the page uses is documented by the endpoints in `app/server.js` (`/api/invoices`, `/api/check`, `/api/correct`, `/api/approve`, `/api/fund`, `/api/release`, `/api/quote`).
 
 ## How NEAR is used (named, concretely)
 
@@ -56,8 +58,8 @@ The API the page uses is documented by the endpoints in `app/server.js` (`/api/i
 |---|---|
 | Agent clerk logic (prepare, check, flag, human gate) | **Real and running** — `app/clerk.js`, covered by tests, exercised by the demo UI. |
 | Demo app + UI | **Real and running** — zero-dependency Node server, `app/server.js`. |
-| Escrow flow in the demo | **Local simulation** — `app/ledger.js` mirrors the contract's states and rules 1:1 (Created → Approved → Funded → Released/Cancelled, client-only approval with an approved-sum cap, exact-amount funding, client-only release) so judges can run it with no wallet or faucet. |
-| The NEAR contract itself | **Real code, deployed and proven on testnet** — TypeScript source compiles to a 541,471-byte Wasm exporting all 8 methods, deployed to the fresh account `paid-in-full-v2.testnet` (deploy tx `CLzB1jES9NcS43DMPd9TYTrQfi8T55DeXosfg3nKYCoH`, code hash `9iHW5xy1jvLKEowgy1tA1jU4zvtofpYgoY9W4oVKM6G8`); the full escrow loop was proven on chain with the new gate using two distinct accounts (create_invoice → client_approve with cap → approve_and_fund → release), the cap was proven too (a 0.0124 NEAR invoice approved with a 0.01 NEAR cap cannot be funded), and eight denial checks passed on-chain (fund without approval, stranger approve/fund/release, wrong-amount fund, double-fund, double-release). See `DEPLOY.md`. |
+| Escrow flow in the demo | **Local simulation** — `app/ledger.js` mirrors the contract's states and rules 1:1 (Created (approved) → Funded → Released/Cancelled, client-only approval with an approved-sum cap, exact-amount funding, client-only release) so judges can run it with no wallet or faucet. |
+| The NEAR contract itself | **Real code, deployed and proven on testnet** — TypeScript source compiles to a 541,663-byte Wasm exporting all 8 methods, deployed to the fresh account `paid-in-full-v3.testnet` (deploy tx `8e3kfhWMRHqijsMDMb2BgS8n5tkvmi1gNXJci2XyPKMx`, code hash `Fopmv4Gpcark4EDU9ir9yWApFwbJSDVD9VMT2nycPpjD`); the full escrow loop was proven on chain with the new gate using two distinct accounts (create_invoice → client_approve with cap → approve_and_fund → release), the cap is now validated at approval (a 0.01 NEAR cap on a 0.0124 NEAR invoice fails fast with a clear error and records nothing; the client retries with a correct cap), cancel from Created was proven (no funds move), and ten denial checks passed on-chain (fund without approval, stranger approve/fund/release/cancel, wrong-amount fund, double-fund, double-release, cancel after release, low-cap approve). See `DEPLOY.md`. |
 | Live on-chain state in the demo | **Real, live, read-only** — section 5 of the desk ("Show live on-chain invoices") reads the deployed contract's live invoice state straight from the testnet RPC (`GET /api/onchain`, `app/onchain.js`); the demo's payment is simulated, but the invoice table it shows is the real contract's, refreshed from the RPC every 60 s. No keys, no signing, no writes. |
 | NEAR Intents | **Real, live, dry-only** — quotes are fetched from the production 1Click API with `dry: true`. No deposit address is ever requested; no funds can move. |
 | Money | **No real money anywhere.** No mainnet account, no mainnet deploy, no real transaction of any kind. Simulated balances are test numbers in a local process. |

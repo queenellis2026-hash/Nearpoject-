@@ -12,7 +12,7 @@ Paid in Full is an invoice desk on @NEARProtocol: an agent clerk prepares the in
 
 Built at NEAR HACKATHON. #NEARHackathon
 
-Repo: [REPO LINK]
+Repo: https://github.com/queenellis2026-hash/Nearpoject-
 
 Demo video attached — the full moment: invoice raised, overage flagged, human approves the corrected amount, escrow pays out.
 

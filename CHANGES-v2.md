@@ -24,7 +24,8 @@
 ## The demo app
 - `POST /api/contract-sum` is gone. There is deliberately no endpoint that
   sets a global approved sum; the sum is per-invoice at creation, raisable
-  only through a signed change order on that invoice.
+  only through a signed change order on that invoice — and only before
+  approval (once approved the cap is frozen on-chain; see CHANGES-v3.md).
 - `app/onchain.js` (new) reads live invoice state from the deployed contract
   over testnet RPC — read-only, no keys. The UI (section 5) shows the live
   on-chain invoices alongside the local simulation, labeled as live.

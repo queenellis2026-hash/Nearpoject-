@@ -5,3 +5,4 @@ contract/build/*.map
 contract/build/*.c
 contract/build/*.h
 *.log
+demo/.whisper-venv/

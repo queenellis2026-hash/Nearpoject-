@@ -11,8 +11,9 @@
 //                     and the deposit is held in escrow by this contract
 //   release           the funding client releases the escrow to the
 //                     contractor (the payment moment)
-//   cancel            the funding client cancels a funded invoice and is
-//                     refunded in full
+//   cancel            the recorded client cancels an invoice while it is
+//                     still Created (unfunded — no funds move) or Funded
+//                     (funded — refunded in full)
 //
 // THE GATE (why client_approve exists, and why it sets a cap): the desk
 // app (app/clerk.js) has an agent clerk that checks every invoice against
@@ -42,11 +43,14 @@
 //   would leave the invoice fundable up to any amount, and a cap without
 //   approval would be meaningless. One call, one decision: the client
 //   approves the invoice AND states the sum they approve it up to.
-// - The cap is set once, before funding. If the cap is below the invoice
-//   amount, funding is blocked with a clear error ("invoice amount
-//   exceeds the approved sum") — the remedy is a corrected invoice (a new
-//   invoice id) or a change order raising the approved sum, exactly as
-//   the desk app's workflow does.
+// - The cap is set once, before funding. A cap below the invoice amount
+//   fails fast at approval: client_approve asserts the approved sum is at
+//   least the invoice amount, panics with a clear error, and — because a
+//   NEAR panic rolls the call back — records nothing, so the client can
+//   retry with a correct cap. There is NO on-chain change order that
+//   raises the cap after approval, and the cap is never re-set. The
+//   remedy for a wrong invoice amount is a corrected invoice (a new
+//   invoice id), exactly as the desk app's workflow does.
 //
 // Build:  npm run build   (produces build/paid-in-full.wasm)
 // Deploy (testnet only): see scripts/deploy-testnet.sh — needs a testnet
@@ -118,6 +122,7 @@ export class PaidInFull {
     assert(near.predecessorAccountId() === inv.client, 'only the recorded client can approve this invoice');
     assert(!inv.approved, 'invoice is already approved');
     assert(BigInt(approved_sum_yocto) > 0n, 'approved sum must be positive');
+    assert(BigInt(approved_sum_yocto) >= BigInt(inv.amountYocto), 'approved sum must be at least the invoice amount');
     inv.approved = true;
     inv.approvedSumYocto = approved_sum_yocto;
     this.invoices.set(invoice_id, inv);
@@ -150,16 +155,22 @@ export class PaidInFull {
     near.log(`invoice ${invoice_id} released to ${inv.contractor}`);
   }
 
+  // Cancels an invoice that is still Created (unfunded — no escrow
+  // exists, so no transfer is attempted) or Funded (refund in full).
+  // Only the recorded client may cancel.
   @call({})
   cancel({ invoice_id }: { invoice_id: string }) {
     const inv = this._get(invoice_id);
-    assert(inv.status === 'Funded', `cannot cancel an invoice in status ${inv.status}`);
+    assert(inv.status === 'Created' || inv.status === 'Funded', `cannot cancel an invoice in status ${inv.status}`);
     assert(near.predecessorAccountId() === inv.client, 'only the client who funded this invoice can cancel it');
+    const wasFunded = inv.status === 'Funded';
     inv.status = 'Cancelled';
     this.invoices.set(invoice_id, inv);
-    const promise = near.promiseBatchCreate(inv.client);
-    near.promiseBatchActionTransfer(promise, BigInt(inv.amountYocto));
-    near.log(`invoice ${invoice_id} cancelled, refunded to ${inv.client}`);
+    if (wasFunded) {
+      const promise = near.promiseBatchCreate(inv.client);
+      near.promiseBatchActionTransfer(promise, BigInt(inv.amountYocto));
+    }
+    near.log(`invoice ${invoice_id} cancelled${wasFunded ? ', refunded to ' + inv.client : ' (unfunded, no refund)'}`);
   }
 
   @view({})

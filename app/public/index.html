@@ -53,7 +53,9 @@
 <section>
   <h2>3. Resolve &amp; <span class="actor-human">human approval</span></h2>
   <p>If the clerk flags an overage, a human either corrects the invoice or approves a change
-     order that raises the approved sum. The clerk then re-checks. Nothing is payable before a human approves.</p>
+     order that raises the approved sum — before approval. Once the client approves, the
+     approved sum is frozen; only a new invoice can change it. The clerk then re-checks.
+     Nothing is payable before a human approves.</p>
   <label>Corrected invoice total (USD) <input id="correctedTotal" type="number" value="12000"></label>
   <button onclick="correct()">Human: correct invoice to this total</button>
   <label>Change order — description <input id="coDesc" value="Drain reroute — approved as extra work"></label>
@@ -74,26 +76,62 @@
   <div id="fundOut"></div>
   <div id="payOut"></div>
   <h3>NEAR Intents — live DRY settlement quote (no funds move)</h3>
-  <p>What would this invoice settle to in USDT if the homeowner paid cross-chain? Quoted live from the NEAR Intents 1Click API with <code>dry: true</code>.</p>
-  <label>Amount (NEAR) <input id="quoteAmt" type="number" value="1"></label>
-  <button onclick="quote()">Get dry quote</button>
+  <p>What would this invoice settle to in USDT if the homeowner paid cross-chain? Quoted live from the NEAR Intents 1Click API with <code>dry: true</code>. The invoice quote prices the current invoice's full amount — the NEAR amount is computed from the live 1-NEAR dry-quote rate, not guessed. The amount box below is a separate small example, not the invoice amount.</p>
+  <button onclick="quoteInvoice()">Get dry quote for this invoice</button>
+  <label>Example amount (NEAR) — a small example dry quote, not the invoice amount <input id="quoteAmt" type="number" value="1"></label>
+  <button onclick="quote()">Get example dry quote</button>
   <pre id="quoteOut">—</pre>
-  <p class="explorer">Escrow contract live on NEAR testnet: <a href="https://explorer.testnet.near.org/accounts/paid-in-full-v2.testnet" target="_blank" rel="noopener">paid-in-full-v2.testnet</a><br>
-  Deploy transaction: <a href="https://explorer.testnet.near.org/transactions/CLzB1jES9NcS43DMPd9TYTrQfi8T55DeXosfg3nKYCoH" target="_blank" rel="noopener"><code>CLzB1jES9NcS43DMPd9TYTrQfi8T55DeXosfg3nKYCoH</code></a><br>
-  Code hash: <code>9iHW5xy1jvLKEowgy1tA1jU4zvtofpYgoY9W4oVKM6G8</code><br>
+  <p class="explorer">Escrow contract live on NEAR testnet: <a href="https://explorer.testnet.near.org/accounts/paid-in-full-v3.testnet" target="_blank" rel="noopener">paid-in-full-v3.testnet</a><br>
+  Deploy transaction: <a href="https://explorer.testnet.near.org/transactions/8e3kfhWMRHqijsMDMb2BgS8n5tkvmi1gNXJci2XyPKMx" target="_blank" rel="noopener"><code>8e3kfhWMRHqijsMDMb2BgS8n5tkvmi1gNXJci2XyPKMx</code></a><br>
+  Code hash: <code>Fopmv4Gpcark4EDU9ir9yWApFwbJSDVD9VMT2nycPpjD</code><br>
   The demo above is a local simulation of that contract — same states, same rules, no real funds.</p>
 </section>
 
 <section>
   <h2>5. Live on-chain state — the real contract, read from NEAR testnet</h2>
   <p>The payment above is simulated. The contract is not: this reads the live invoice
-     state straight off the deployed contract (<code>paid-in-full-v2.testnet</code>) through
-     the testnet RPC — the same invoices the on-chain proof ran on (inv-2001 released,
-     inv-2002 and inv-2003 still Created, over the approved sum). No keys, no signing,
+     state straight off the deployed contract (<code>paid-in-full-v3.testnet</code>) through
+     the testnet RPC — the same invoices the on-chain proof ran on (inv-3001 released,
+     inv-3002 funded, inv-3003 cancelled before funding). No keys, no signing,
      read-only.</p>
   <button onclick="onchain()">Show live on-chain invoices</button>
   <div id="onchainOut"></div>
 </section>
+
+<section>
+  <h2>6. Live on-chain — connect a testnet wallet and do it for real</h2>
+  <p><b>This section writes REAL signed transactions to the deployed testnet contract
+     (<code>paid-in-full-v3.testnet</code>).</b> Sections 1–4 above stay a simulation;
+     this section is the real thing. <b>Amount honesty:</b> the live invoice uses a
+     small testnet amount — <b>0.01 NEAR by default</b> — NOT the $12,000 simulated
+     invoice above. Nothing here moves the $12,000; that invoice never touches the chain.</p>
+  <p>Connect a NEAR testnet wallet (MyNearWallet). The wallet asks you to approve a
+     function-call key limited to the five contract methods on this contract only —
+     no full-access key, no other contract. You are redirected to the wallet to sign
+     each transaction, then back here. The connected account becomes the recorded
+     <b>client</b> on any invoice it creates — only that client can approve, fund,
+     release or cancel it.</p>
+  <button id="walletConnect">Connect testnet wallet</button>
+  <button id="walletDisconnect" style="display:none">Disconnect</button>
+  <div id="walletAccount"></div>
+  <label>Live invoice id <input id="liveInvoiceId" value="" placeholder="e.g. inv-3004"></label>
+  <label>Job <input id="liveJob" value="Weekley bathroom remodel — live testnet invoice"></label>
+  <label>Contractor (NEAR account — receives the release) <input id="liveContractor" value="crew.paid-in-full-v3.testnet"></label>
+  <label>Live amount (NEAR — a small testnet amount, not the $12,000 sim invoice) <input id="liveAmount" type="text" value="0.01"></label>
+  <button id="liveCreate">1. Create live invoice</button>
+  <button id="liveApprove">2. Approve (cap = amount)</button>
+  <button id="liveFund">3. Fund exactly the amount</button>
+  <button id="liveRelease">4. Release to contractor</button>
+  <button id="liveCancel">Cancel invoice</button>
+  <button id="liveRefresh">Refresh live state</button>
+  <div id="walletOut"></div>
+  <p class="explorer">Each step signs a transaction in your wallet and shows the transaction hash
+     (link to the testnet explorer) plus the invoice state read back live from the chain.
+     If you have no testnet wallet, sections 1–5 still demo the whole flow — this section
+     is the live proof for judges who do.</p>
+</section>
+
+<script type="module" src="/wallet.js"></script>
 
 <script>
 let currentId = null;
@@ -181,6 +219,12 @@ async function quote() {
   try { $('quoteOut').textContent = JSON.stringify(await api('GET', '/api/quote?amountNear=' + $('quoteAmt').value), null, 2); }
   catch (e) { $('quoteOut').textContent = e.message; }
 }
+async function quoteInvoice() {
+  if (!currentId) { $('quoteOut').textContent = 'Prepare an invoice first (section 2) — the quote prices the current invoice.'; return; }
+  $('quoteOut').textContent = 'Fetching live dry quote for this invoice…';
+  try { $('quoteOut').textContent = JSON.stringify(await api('GET', '/api/quote?invoiceId=' + currentId), null, 2); }
+  catch (e) { $('quoteOut').textContent = e.message; }
+}
 function nearAmt(yocto) { return (Number(yocto) / 1e24).toFixed(4) + ' NEAR'; }
 async function onchain() {
   $('onchainOut').innerHTML = '<p>Reading live state from NEAR testnet…</p>';
@@ -191,7 +235,7 @@ async function onchain() {
       '<table><tr><th>Invoice</th><th>Status</th><th>Approved</th><th>Cap</th><th>Amount</th></tr>' +
       data.invoices.map(inv =>
         `<tr><td>${inv.id}</td><td><span class="status">${inv.status}</span></td><td>${inv.approved ? 'yes' : 'no'}</td><td>${nearAmt(inv.approvedSumYocto)}</td><td>${nearAmt(inv.amountYocto)}</td></tr>`).join('') +
-      '</table><p class="explorer">Read live from the testnet RPC — the same invoices the on-chain proof ran on. inv-2001 was released to the contractor; inv-2002 and inv-2003 are still Created because their amounts sit over the approved sum.</p>';
+      '</table><p class="explorer">Read live from the testnet RPC — the same invoices the on-chain proof ran on. inv-3001 was released to the contractor; inv-3002 is Funded; inv-3003 was cancelled from Created.</p>';
   } catch (e) { $('onchainOut').innerHTML = '<p class="err">Live on-chain state unavailable: ' + e.message + '</p>'; }
 }
 </script>

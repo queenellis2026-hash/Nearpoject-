@@ -102,16 +102,24 @@ test('a correction after approval VOIDS the approval — re-check and re-approva
   assert.equal(inv.status, 'approved');
 });
 
-test('a change order after approval also voids the approval', () => {
+test('a change order after approval is REJECTED — the approved sum is frozen', () => {
   const inv = demoInvoice();
   clerk.correctInvoiceTotal(inv, 12000_00, 'Chris');
   clerk.checkAgainstApproved(inv);
   clerk.humanApprove(inv, { approvedBy: 'Chris' });
   assert.equal(inv.status, 'approved');
-  clerk.approveChangeOrder(inv, { description: 'Extra work', amountCents: 100_00 }, 'Chris');
-  assert.equal(inv.status, 'quoted');
-  assert.equal(inv.approvedBy, undefined);
-  assert.equal(inv.clerkCheck, null);
+  // The on-chain contract has no change-order function and no re-approve:
+  // once approved, the cap is frozen and only a new invoice can change it.
+  assert.throws(
+    () => clerk.approveChangeOrder(inv, { description: 'Extra work', amountCents: 100_00 }, 'Chris'),
+    /already approved|frozen/,
+  );
+  // Nothing changed: still approved, same sum, same approver, check intact.
+  assert.equal(inv.status, 'approved');
+  assert.equal(inv.approvedBy, 'Chris');
+  assert.equal(inv.approvedSumCents, 12000_00);
+  assert.ok(inv.clerkCheck, 'clerk check intact');
+  assert.equal(inv.changeOrders.length, 1); // only the correction — no change order was added
 });
 
 test('ledger mirrors the contract: fund moves money into escrow, release pays the contractor', () => {
@@ -184,20 +192,55 @@ test('ledger fund and release are separate steps — the Funded state is visible
   assert.equal(ledger.balanceOf('gulf-coast-crew'), 12000_00);
 });
 
-test('the approved-sum cap binds — an invoice over the cap cannot be funded', () => {
+test('ledger approve rejects a cap below the invoice amount — fail fast, state unchanged, retry succeeds', () => {
   const ledger = new EscrowLedger();
-  ledger.mint('homeowner', 20000_00);
+  ledger.mint('homeowner', 30000_00); // enough to fund both the $12,400 and the $12,000 escrows below
   // The flagged invoice: $12,400 against a $12,000 approved sum.
   ledger.createEscrow('inv-5', 'gulf-coast-crew', 12400_00, 'homeowner');
-  ledger.approve('inv-5', 'homeowner', 12000_00);
-  assert.equal(ledger.escrowOf('inv-5').approvedSumCents, 12000_00);
-  // Approved, but over the cap: funding fails.
-  assert.throws(() => ledger.fund('inv-5', 'homeowner'), /exceeds the approved sum/);
+  // A cap below the amount fails fast at approval — mirror of the
+  // contract's client_approve assert. Nothing is recorded, so the client
+  // can retry with a correct cap.
+  assert.throws(() => ledger.approve('inv-5', 'homeowner', 12000_00), /at least the invoice amount/);
+  assert.equal(ledger.escrowOf('inv-5').approved, false);
+  assert.equal(ledger.escrowOf('inv-5').approvedSumCents, null);
+  assert.equal(ledger.escrowOf('inv-5').status, 'Created');
+  // Retry with a correct cap succeeds, and the escrow funds.
+  ledger.approve('inv-5', 'homeowner', 12400_00);
+  assert.equal(ledger.escrowOf('inv-5').approvedSumCents, 12400_00);
+  ledger.fund('inv-5', 'homeowner');
+  assert.equal(ledger.escrowOf('inv-5').status, 'Funded');
   // The corrected invoice: $12,000 against the same $12,000 cap — funds.
   ledger.createEscrow('inv-6', 'gulf-coast-crew', 12000_00, 'homeowner');
   ledger.approve('inv-6', 'homeowner', 12000_00);
   ledger.fund('inv-6', 'homeowner');
   assert.equal(ledger.escrowOf('inv-6').status, 'Funded');
+});
+
+test('ledger cancel from Created works — no escrow held, no funds move', () => {
+  const ledger = new EscrowLedger();
+  ledger.mint('homeowner', 20000_00);
+  ledger.createEscrow('inv-8', 'gulf-coast-crew', 12000_00, 'homeowner');
+  // A stranger cannot cancel even an unfunded escrow.
+  assert.throws(() => ledger.cancel('inv-8', 'gulf-coast-crew'), /only the recorded client/);
+  assert.equal(ledger.escrowOf('inv-8').status, 'Created');
+  ledger.cancel('inv-8', 'homeowner');
+  assert.equal(ledger.escrowOf('inv-8').status, 'Cancelled');
+  assert.equal(ledger.balanceOf('homeowner'), 20000_00); // nothing moved
+  assert.equal(ledger.balanceOf('gulf-coast-crew'), 0);
+  // A cancelled escrow cannot be funded or approved afterwards.
+  assert.throws(() => ledger.fund('inv-8', 'homeowner'), /cannot fund escrow in status Cancelled/);
+  assert.throws(() => ledger.approve('inv-8', 'homeowner', 12000_00), /cannot approve escrow in status Cancelled/);
+});
+
+test('ledger cancel after release is still rejected', () => {
+  const ledger = new EscrowLedger();
+  ledger.mint('homeowner', 20000_00);
+  ledger.createEscrow('inv-9', 'gulf-coast-crew', 12000_00, 'homeowner');
+  ledger.approve('inv-9', 'homeowner', 12000_00);
+  ledger.fund('inv-9', 'homeowner');
+  ledger.release('inv-9', 'homeowner');
+  assert.throws(() => ledger.cancel('inv-9', 'homeowner'), /cannot cancel escrow in status Released/);
+  assert.equal(ledger.balanceOf('gulf-coast-crew'), 12000_00); // payment stands
 });
 
 test('approval needs a positive cap — zero or missing is rejected', () => {

@@ -3,9 +3,10 @@
 // on-chain invoice state so a judge can see NEAR doing something real.
 // Uses Node's global fetch (Node 18+); zero dependencies.
 //
-// The contract account is the FRESH v2 deployment (paid-in-full-v2.testnet),
-// not the v1 account (paid-in-full.testnet), whose storage holds pre-fix
-// invoices without the client/approved-sum fields.
+// The contract account is the FRESH v3 deployment (paid-in-full-v3.testnet),
+// not the v2 account (paid-in-full-v2.testnet), whose storage holds v2
+// invoices, or the v1 account (paid-in-full.testnet), whose storage holds
+// pre-fix invoices without the client/approved-sum fields.
 'use strict';
 
 const RPC_URL = 'https://rpc.testnet.near.org';

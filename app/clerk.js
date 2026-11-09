@@ -39,7 +39,11 @@ let invoiceCounter = 0;
 // route was the sharpest no-auth hole in the demo (any caller could raise
 // the ceiling to anything, which made "the clerk may never pay past it"
 // false even inside the app). The sum is committed with the invoice and
-// can only rise through a signed change order on that invoice.
+// can only rise through a signed change order on that invoice — and only
+// BEFORE the client approves it. Once the client approves, the approved
+// sum is FROZEN: the on-chain contract has no change-order function and
+// no re-approve, so the cap cannot move after approval; only a new
+// invoice can change it.
 function createInvoice({ jobName, client, contractor, lineItems, changeOrders = [], approvedSumCents }) {
   if (!jobName) throw new Error('jobName is required');
   const approved = Math.round(Number(approvedSumCents));
@@ -91,8 +95,14 @@ function checkAgainstApproved(invoice) {
 }
 
 // A human can approve a change order, which raises the invoice's
-// approved contract sum. After that the clerk re-checks; this is the
-// honest way an overage gets resolved (paper first, then money).
+// approved contract sum — but ONLY BEFORE the client approves the
+// invoice. A change order raises the approved sum the client WILL
+// approve up to; once the client has approved, the approved sum is
+// FROZEN (the on-chain contract has no change-order function and no
+// re-approve), so a change order after approval is REJECTED here, and
+// only a new invoice can change the approved sum. After a pre-approval
+// change order the clerk re-checks; this is the honest way an overage
+// gets resolved (paper first, then money).
 //
 // The change order is AUTHORIZATION, not billing: it records that the
 // client agreed to the extra work and raises the invoice's approved sum,
@@ -105,19 +115,22 @@ function checkAgainstApproved(invoice) {
 // The approved sum lives ON the invoice (see createInvoice), so the raise
 // happens here — there is no global sum for a caller to bump.
 //
-// A change order changes the authorized sum, so — like a correction — it
-// invalidates any prior approval: the invoice goes back to 'quoted', the
-// approver is cleared, and the clerk check is cleared. Re-check and
-// re-approval are required before payment.
+// A pre-approval change order changes the authorized sum, so — like a
+// correction — it clears any prior approval state: the invoice goes back
+// to 'quoted', the approver is cleared, and the clerk check is cleared.
+// Re-check and re-approval are required before payment.
 function approveChangeOrder(invoice, changeOrder, approvedBy) {
   if (!approvedBy) throw new Error('a change order needs a human approver (approvedBy)');
+  if (invoice.status === 'approved') {
+    throw new Error('cannot approve a change order: the invoice is already approved — the approved sum is frozen; only a new invoice can change it');
+  }
   const co = { description: changeOrder.description || 'change order', amountCents: Math.round(Number(changeOrder.amountCents) || 0), approvedBy };
   invoice.changeOrders.push(co);
   invoice.approvedSumCents += co.amountCents;
   invoice.status = 'quoted';
   invoice.approvedBy = undefined;
   invoice.clerkCheck = null;
-  invoice.history.push({ at: 'now', event: 'change-order-approved', detail: `${co.description}: +$${(co.amountCents / 100).toFixed(2)} approved by ${approvedBy} — approved sum rises to $${(invoice.approvedSumCents / 100).toFixed(2)}; prior approval void, re-check and re-approval required` });
+  invoice.history.push({ at: 'now', event: 'change-order-approved', detail: `${co.description}: +$${(co.amountCents / 100).toFixed(2)} approved by ${approvedBy} — approved sum rises to $${(invoice.approvedSumCents / 100).toFixed(2)} (pre-approval only; once approved the sum is frozen); re-check and approval required before payment` });
   return invoice;
 }
 

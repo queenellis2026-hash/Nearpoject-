@@ -28,7 +28,7 @@ const { fetchOnchainInvoicesCached, startOnchainRefresh } = require('./onchain')
 // The deployed contract account (fresh v2 deployment — see DEPLOY.md).
 // Override with CONTRACT_ACCOUNT=... to point the on-chain panel at a
 // different deployment.
-const CONTRACT_ACCOUNT = process.env.CONTRACT_ACCOUNT || 'paid-in-full-v2.testnet';
+const CONTRACT_ACCOUNT = process.env.CONTRACT_ACCOUNT || 'paid-in-full-v3.testnet';
 
 // Warm the live on-chain cache in the background (see app/onchain.js) so
 // the panel answers instantly on click.
@@ -43,7 +43,10 @@ const invoices = new Map(); // id -> invoice
 // by the human client (see clerk.createInvoice) — a global "set the
 // ceiling" route let any caller raise it to anything, which made "the
 // clerk may never pay past it" false even inside the app. The sum can
-// only rise through a signed change order on that invoice.
+// only rise through a signed change order on that invoice, and only BEFORE
+// the client approves it: once approved the sum is frozen (the on-chain
+// contract has no change-order function and no re-approve), and only a
+// new invoice can change it.
 
 // Simulated test funds for the local demo (testnet faucet equivalent).
 ledger.mint('homeowner', 100000_00);
@@ -90,15 +93,24 @@ const routes = {
     const { invoiceId, correctedTotalCents, correctedBy, note } = await readBody(req);
     const inv = mustGet(invoiceId);
     clerk.correctInvoiceTotal(inv, correctedTotalCents, correctedBy, note);
+    // The correction voids the clerk approval; void the ledger approval
+    // in the same request, or the stale ledger approval (old cap) would
+    // survive and block — or wrongly permit — the re-approval.
+    ledger.voidApproval(inv.id);
     syncEscrowAmount(inv);
     const check = clerk.checkAgainstApproved(inv);
     json(res, 200, { invoice: inv, check });
   },
 
-  // Human approves a change order for a SPECIFIC invoice. The change order
-  // is recorded on that invoice (with the approver and a history entry),
-  // and the invoice's approved sum rises by the change order amount so the
-  // clerk's re-check can pass. Requires an invoice id and a named human.
+  // Human approves a change order for a SPECIFIC invoice, and only BEFORE
+  // the invoice is approved. The change order is recorded on that invoice
+  // (with the approver and a history entry), and the invoice's approved
+  // sum rises by the change order amount so the clerk's re-check can pass.
+  // Once the client approves, the approved sum is FROZEN — the on-chain
+  // contract has no change-order function and no re-approve — so a change
+  // order after approval is rejected (clerk.approveChangeOrder throws)
+  // and only a new invoice can change the approved sum. Requires an
+  // invoice id and a named human.
   'POST /api/change-order': async (req, res) => {
     const { invoiceId, changeOrder, approvedBy } = await readBody(req);
     if (!invoiceId) throw new Error('a change order needs an invoiceId');
@@ -108,6 +120,13 @@ const routes = {
     }
     const inv = mustGet(invoiceId);
     clerk.approveChangeOrder(inv, changeOrder, approvedBy);
+    // A pre-approval change order voids any prior clerk approval (the
+    // clerk resets the invoice to quoted); void the ledger approval in
+    // the same request so the next approval sets the cap from the NEW
+    // approved sum instead of funding against the old one. A change order
+    // on an already-approved invoice is rejected by the clerk above, so
+    // this never re-opens a frozen cap.
+    ledger.voidApproval(inv.id);
     const check = clerk.checkAgainstApproved(inv);
     json(res, 200, {
       invoice: inv,
@@ -123,11 +142,35 @@ const routes = {
   // and /api/fund asserts both the approval and the cap before moving
   // money. The demo app passes the $12,000 approved sum as the cap, so
   // the on-chain rule "no dollar moves past the approved sum" holds here.
+  // The ledger is approved FIRST, and only then the clerk: if the ledger
+  // throws (e.g. escrow already approved), the clerk has not mutated
+  // yet, so a failed approval leaves no half-approved invoice behind.
+  // The mirror case is covered too: if the clerk then throws (no clerk
+  // check yet, missing approver), the ledger approval is voided again
+  // before the error propagates — either both approve or neither does.
+  // Approval FREEZES the cap: a change order cannot raise it afterwards
+  // (see /api/change-order) — only a new invoice can change the approved
+  // sum once the client has approved.
   'POST /api/approve': async (req, res) => {
     const { invoiceId, approvedBy } = await readBody(req);
     const inv = mustGet(invoiceId);
-    clerk.humanApprove(inv, { approvedBy });
+    // Clerk's read-only pre-checks FIRST, so a refusal carries the clerk's
+    // instructive message (flagged / unchecked / wrong status) instead of
+    // the ledger's cap error. These checks mutate nothing, so the
+    // ledger-first atomicity below is preserved: either both approve or
+    // neither does. (F1 follow-up: ledger-first alone surfaced the cap
+    // error for a flagged invoice, hiding the FLAGGED refusal the demo shows.)
+    if (!approvedBy) throw new Error('human approval is required: pass { approvedBy: "<name>" }');
+    if (!inv.clerkCheck) throw new Error('clerk has not checked this invoice yet');
+    if (inv.flagged) throw new Error(`cannot approve: invoice is FLAGGED (${inv.clerkCheck.verdict}). Resolve the overage and re-check first.`);
+    if (inv.status !== 'quoted') throw new Error(`cannot approve an invoice in status "${inv.status}"`);
     ledger.approve(inv.id, inv.client, inv.approvedSumCents);
+    try {
+      clerk.humanApprove(inv, { approvedBy });
+    } catch (e) {
+      ledger.voidApproval(inv.id);
+      throw e;
+    }
     json(res, 200, inv);
   },
 
@@ -162,11 +205,47 @@ const routes = {
   },
 
   // Live NEAR Intents DRY quote (no funds move).
+  //
+  // Honest about the amount: with ?invoiceId=<id> the quote is for the
+  // CURRENT INVOICE's amount. The NEAR price is NOT invented — it comes
+  // from the live API itself: a 1-NEAR dry quote's amountOutUsd is the
+  // implied USD price of 1 NEAR, the invoice amount in NEAR is
+  // invoice USD / that rate, and the returned quote is a second live dry
+  // quote for that NEAR amount. With ?amountNear=<n> (or no params) the
+  // quote is a plain example for that many NEAR — labelled as such, NOT
+  // the invoice amount.
   'GET /api/quote': async (req, res, url) => {
-    const amountNear = url.searchParams.get('amountNear') || '1';
+    const invoiceId = url.searchParams.get('invoiceId');
+    // Unknown invoice id is a client error (400 via the route wrapper),
+    // not a quote failure — look it up before the quote try/catch.
+    const inv = invoiceId ? mustGet(invoiceId) : null;
     try {
+      if (inv) {
+        const unit = await dryQuote({ amountNear: 1 });
+        const nearUsd = parseFloat(unit.amountOutUsd);
+        if (!Number.isFinite(nearUsd) || nearUsd <= 0) {
+          throw new Error('live quote returned no usable NEAR price');
+        }
+        const invoiceUsd = inv.totalCents / 100;
+        const invoiceNear = invoiceUsd / nearUsd;
+        const q = await dryQuote({ amountNear: invoiceNear });
+        json(res, 200, {
+          ...q,
+          basis: 'invoice-amount',
+          invoiceId,
+          invoiceTotalUsd: invoiceUsd,
+          invoiceAmountNear: invoiceNear,
+          note: `DRY quote only — for the current invoice amount ($${invoiceUsd.toFixed(2)} ≈ ${invoiceNear.toFixed(2)} NEAR at the live 1-NEAR dry-quote rate of $${nearUsd.toFixed(4)}/NEAR). No deposit address issued, no funds moved.`,
+        });
+        return;
+      }
+      const amountNear = url.searchParams.get('amountNear') || '1';
       const q = await dryQuote({ amountNear });
-      json(res, 200, q);
+      json(res, 200, {
+        ...q,
+        basis: 'example',
+        note: `DRY quote only — an example for ${amountNear} NEAR, NOT the invoice amount. No deposit address issued, no funds moved.`,
+      });
     } catch (e) {
       json(res, 502, { error: `dry quote unavailable: ${e.message}`, dry: true });
     }
@@ -174,8 +253,8 @@ const routes = {
 
   // Live on-chain state, read-only (testnet RPC views of the deployed
   // contract — no keys, no signing, no writes). This is the REAL contract's
-  // live invoice state, not a mock: the proof invoices (inv-2001 Released,
-  // inv-2002/inv-2003 Created over the cap) are on paid-in-full-v2.testnet.
+  // live invoice state, not a mock: the proof invoices (inv-3001 Released,
+  // inv-3002 Funded, inv-3003 Cancelled) are on paid-in-full-v3.testnet.
   // The server refreshes it from the RPC every 60 s in the background
   // (app/onchain.js) so the panel answers instantly on click. If the RPC
   // is unreachable the UI shows the error, not a fake panel.
@@ -212,6 +291,15 @@ const server = http.createServer(async (req, res) => {
     const html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(html);
+    return;
+  }
+  // Section 6 live-wallet client module (app/public/wallet.js). Static
+  // file only — the wallet library itself loads from the esm.sh CDN at
+  // runtime, so the server stays zero-dependency.
+  if (req.method === 'GET' && url.pathname === '/wallet.js') {
+    const js = fs.readFileSync(path.join(__dirname, 'public', 'wallet.js'), 'utf8');
+    res.writeHead(200, { 'Content-Type': 'text/javascript' });
+    res.end(js);
     return;
   }
   json(res, 404, { error: 'not found' });

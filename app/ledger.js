@@ -1,11 +1,15 @@
 // ledger.js — a local simulation of the NEAR testnet escrow contract
 // (contract/src/contract.ts), with the same states and rules:
 //
-//   contract:  Created --client_approve (recorded client only)--> Approved
-//              Approved --approve_and_fund (deposit == amount)--> Funded
+//   contract:  Created (approved flag set by client_approve, cap recorded)
+//              --approve_and_fund (deposit == amount)--> Funded
 //              Funded  --release (by the client who funded)-----> Released
-//              Funded  --cancel  (by the client who funded)-----> Cancelled (refund)
+//              Created|Funded --cancel (by the recorded client)--> Cancelled
+//                        (Created: no escrow held, no funds move;
+//                         Funded: refund in full)
 //
+// There is NO "Approved" status: approval is a boolean flag on a Created
+// escrow, set by client_approve together with the approved-sum cap.
 // The app runs against this ledger in "local" mode so a judge can run the
 // full flow with no wallet, no faucet, and no network. Amounts here are
 // integer cents (the desk app's unit); the on-chain contract uses
@@ -56,7 +60,9 @@ class EscrowLedger {
   // Mirrors contract client_approve: only the recorded client, only while
   // the escrow is still Created (unfunded). The approval SETS the cap —
   // the cap-setting is the approval, exactly as on-chain. The cap is the
-  // approved contract sum the clerk checked against.
+  // approved contract sum the clerk checked against. Like the contract,
+  // the cap must be at least the invoice amount: a too-low cap fails fast
+  // here, records nothing, and the client can retry with a correct cap.
   approve(invoiceId, caller, approvedSumCents) {
     const e = this._get(invoiceId);
     if (e.status !== 'Created') throw new Error(`cannot approve escrow in status ${e.status}`);
@@ -64,8 +70,27 @@ class EscrowLedger {
     if (e.approved) throw new Error('escrow is already approved');
     const cap = Math.round(Number(approvedSumCents));
     if (!Number.isFinite(cap) || cap <= 0) throw new Error('approved sum must be positive');
+    if (cap < e.amountCents) throw new Error('approved sum must be at least the invoice amount');
     e.approved = true;
     e.approvedSumCents = cap;
+    return e;
+  }
+
+  // Voids a prior approval: clears the approved flag AND the cap, so the
+  // escrow must be approved again (with the current approved sum as the
+  // cap) before it can fund. Only while the escrow is still Created —
+  // never void a Funded/Released escrow, where money has already moved
+  // or is held. No on-chain counterpart exists (on-chain amounts are
+  // immutable, so a stale approval cannot arise there); the desk app
+  // needs it because a correction or change order voids the clerk's
+  // approval, and the ledger's approval must go with it in the same
+  // request, or a stale ledger approval would let the old cap fund the
+  // new total. Idempotent when nothing is approved yet.
+  voidApproval(invoiceId) {
+    const e = this._get(invoiceId);
+    if (e.status !== 'Created') throw new Error(`cannot void approval for escrow in status ${e.status}`);
+    e.approved = false;
+    e.approvedSumCents = null;
     return e;
   }
 
@@ -98,12 +123,16 @@ class EscrowLedger {
     return e;
   }
 
-  // Mirrors contract cancel: refund the funding client.
+  // Mirrors contract cancel: the recorded client may cancel from Created
+  // (unfunded — no escrow held, so no funds move) or from Funded (refund
+  // the funding client in full). Cancel after release is rejected.
   cancel(invoiceId, caller) {
     const e = this._get(invoiceId);
-    if (e.status !== 'Funded') throw new Error(`cannot cancel escrow in status ${e.status}`);
-    if (caller !== e.client) throw new Error('only the client who funded this escrow can cancel it');
-    this.balances.set(e.client, this.balanceOf(e.client) + e.amountCents);
+    if (e.status !== 'Created' && e.status !== 'Funded') throw new Error(`cannot cancel escrow in status ${e.status}`);
+    if (caller !== e.client) throw new Error('only the recorded client can cancel this escrow');
+    if (e.status === 'Funded') {
+      this.balances.set(e.client, this.balanceOf(e.client) + e.amountCents);
+    }
     e.status = 'Cancelled';
     return e;
   }

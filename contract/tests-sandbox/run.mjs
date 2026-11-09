@@ -93,31 +93,61 @@ const crewAfter = BigInt((await crew.balance()).available.toString());
 assert.ok(crewAfter > crewBefore, 'contractor balance must increase after release');
 console.log('release OK — contractor received ~1 test NEAR (sandbox funds)');
 
-// Cancel path refunds the client.
+// Cancel path refunds the client in full.
 await crew.call(contract, 'create_invoice', {
   invoice_id: 'inv-0002', job: 'Fence repair', contractor: crew.accountId, client: client.accountId, amount_yocto: AMOUNT,
 });
 await client.call(contract, 'client_approve', { invoice_id: 'inv-0002', approved_sum_yocto: AMOUNT });
 await client.call(contract, 'approve_and_fund', { invoice_id: 'inv-0002' }, { attachedDeposit: AMOUNT });
+const clientBeforeCancel = BigInt((await client.balance()).available.toString());
 await client.call(contract, 'cancel', { invoice_id: 'inv-0002' });
 inv = await contract.view('get_invoice', { invoice_id: 'inv-0002' });
 assert.equal(inv.status, 'Cancelled');
-console.log('cancel OK — status:', inv.status);
+const clientAfterCancel = BigInt((await client.balance()).available.toString());
+// Refund in full: the client gets the whole 1 NEAR back, minus only the
+// gas of the cancel call itself (allow 0.05 NEAR for gas).
+assert.ok(
+  clientAfterCancel >= clientBeforeCancel + BigInt(AMOUNT) - BigInt('50000000000000000000000'),
+  'cancel-from-Funded must refund the full amount',
+);
+console.log('cancel-from-Funded OK — status:', inv.status, '| client refunded in full');
 
-// The cap binds: an invoice over the approved sum cannot be funded,
-// even after approval. (The $12,400 invoice against a $12,000 approval.)
-const OVER = '1240000000000000000000000000000'; // 1,240 NEAR in yocto
-const CAP = '1200000000000000000000000000000'; // 1,200 NEAR in yocto
+// The cap binds at APPROVAL now, not only at funding: a cap below the
+// invoice amount fails fast in client_approve with a clear error, records
+// nothing (the NEAR panic rolls the call back), and the client can retry
+// with a correct cap. (The $12,400 invoice against a $12,000 approval,
+// scaled to 12.4 / 12 NEAR so the sandbox subaccounts — ~100 NEAR each —
+// can actually fund the retry.)
+// NOTE: with the approval-time check, the funding-time cap check in
+// approve_and_fund can no longer be reached through the normal path — it
+// stays in the contract as defence in depth.
+const OVER = '12400000000000000000000000'; // 12.4 NEAR in yocto
+const CAP = '12000000000000000000000000'; // 12 NEAR in yocto
 await crew.call(contract, 'create_invoice', {
   invoice_id: 'inv-0003', job: 'Over the approved sum', contractor: crew.accountId, client: client.accountId, amount_yocto: OVER,
 });
-await client.call(contract, 'client_approve', { invoice_id: 'inv-0003', approved_sum_yocto: CAP });
 await assert.rejects(
-  client.call(contract, 'approve_and_fund', { invoice_id: 'inv-0003' }, { attachedDeposit: OVER }),
+  client.call(contract, 'client_approve', { invoice_id: 'inv-0003', approved_sum_yocto: CAP }),
+  (err) => {
+    assert.match(String(err), /approved sum must be at least the invoice amount/);
+    return true;
+  },
 );
 inv = await contract.view('get_invoice', { invoice_id: 'inv-0003' });
+assert.equal(inv.approved, false, 'failed approval must record nothing — approved stays false');
+assert.equal(inv.approvedSumYocto, '0', 'failed approval must record nothing — cap stays 0');
 assert.equal(inv.status, 'Created');
-console.log('fund over the cap correctly rejected — status still:', inv.status);
+console.log('low-cap approve rejected with the clear error — approved:', inv.approved, '| cap:', inv.approvedSumYocto, '| status:', inv.status);
+
+// Retry with a correct cap succeeds — the invoice is NOT bricked.
+await client.call(contract, 'client_approve', { invoice_id: 'inv-0003', approved_sum_yocto: OVER });
+inv = await contract.view('get_invoice', { invoice_id: 'inv-0003' });
+assert.equal(inv.approved, true);
+assert.equal(inv.approvedSumYocto, OVER);
+await client.call(contract, 'approve_and_fund', { invoice_id: 'inv-0003' }, { attachedDeposit: OVER });
+inv = await contract.view('get_invoice', { invoice_id: 'inv-0003' });
+assert.equal(inv.status, 'Funded');
+console.log('retry with a correct cap OK — approved, then funded');
 
 // Contractor validation: an empty or malformed contractor is rejected.
 await assert.rejects(crew.call(contract, 'create_invoice', {
@@ -144,6 +174,44 @@ await assert.rejects(client.call(contract, 'release', { invoice_id: 'inv-0005' }
 console.log('release twice correctly rejected');
 await assert.rejects(client.call(contract, 'cancel', { invoice_id: 'inv-0005' }));
 console.log('cancel after release correctly rejected');
+
+// Cancel from Created: an unfunded invoice can be cancelled, and no
+// funds move — the contract holds no escrow for it. Covers both an
+// unapproved invoice and an approved-but-unfunded one.
+await crew.call(contract, 'create_invoice', {
+  invoice_id: 'inv-0006', job: 'Unfunded cancel', contractor: crew.accountId, client: client.accountId, amount_yocto: AMOUNT,
+});
+const contractBefore = BigInt((await contract.balance()).available.toString());
+const clientBeforeUnfundedCancel = BigInt((await client.balance()).available.toString());
+await client.call(contract, 'cancel', { invoice_id: 'inv-0006' });
+inv = await contract.view('get_invoice', { invoice_id: 'inv-0006' });
+assert.equal(inv.status, 'Cancelled');
+const contractAfter = BigInt((await contract.balance()).available.toString());
+const clientAfterUnfundedCancel = BigInt((await client.balance()).available.toString());
+// No escrow exists for an unfunded invoice, so no refund can move: the
+// client must NOT gain the invoice amount, and the contract must NOT lose
+// it. (Exact-zero equality is not asserted: a cancel call still executes
+// a receipt, and sandbox gas accounting can shift the contract's
+// available balance by gas-scale dust — the run showed +0.000257 NEAR.
+// The invariant that matters is that no 1-NEAR refund moves either way.)
+const dust = BigInt('10000000000000000000000'); // 0.01 NEAR
+assert.ok(contractAfter >= contractBefore - dust, 'cancel-from-Created must not drain the contract');
+assert.ok(clientAfterUnfundedCancel <= clientBeforeUnfundedCancel, 'cancel-from-Created must not refund the client');
+console.log('cancel-from-Created (unapproved) OK — status:', inv.status, '| no refund moved');
+
+await crew.call(contract, 'create_invoice', {
+  invoice_id: 'inv-0007', job: 'Approved but unfunded cancel', contractor: crew.accountId, client: client.accountId, amount_yocto: AMOUNT,
+});
+await client.call(contract, 'client_approve', { invoice_id: 'inv-0007', approved_sum_yocto: AMOUNT });
+// A stranger cannot cancel even an unfunded invoice.
+await assert.rejects(crew.call(contract, 'cancel', { invoice_id: 'inv-0007' }));
+inv = await contract.view('get_invoice', { invoice_id: 'inv-0007' });
+assert.equal(inv.status, 'Created', 'stranger cancel must leave the invoice untouched');
+console.log('stranger cancel-from-Created correctly rejected — status still:', inv.status);
+await client.call(contract, 'cancel', { invoice_id: 'inv-0007' });
+inv = await contract.view('get_invoice', { invoice_id: 'inv-0007' });
+assert.equal(inv.status, 'Cancelled');
+console.log('cancel-from-Created (approved, unfunded) OK — status:', inv.status);
 
 await worker.tearDown();
 console.log('\nALL SANDBOX CONTRACT TESTS PASSED');
