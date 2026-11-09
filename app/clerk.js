@@ -99,10 +99,10 @@ function checkAgainstApproved(invoice) {
 // invoice. A change order raises the approved sum the client WILL
 // approve up to; once the client has approved, the approved sum is
 // FROZEN (the on-chain contract has no change-order function and no
-// re-approve), so a change order after approval is REJECTED here, and
-// only a new invoice can change the approved sum. After a pre-approval
-// change order the clerk re-checks; this is the honest way an overage
-// gets resolved (paper first, then money).
+// re-approve), so a change order after approval — or after payment —
+// is REJECTED here, and only a new invoice can change the approved
+// sum. After a pre-approval change order the clerk re-checks; this is
+// the honest way an overage gets resolved (paper first, then money).
 //
 // The change order is AUTHORIZATION, not billing: it records that the
 // client agreed to the extra work and raises the invoice's approved sum,
@@ -121,8 +121,17 @@ function checkAgainstApproved(invoice) {
 // Re-check and re-approval are required before payment.
 function approveChangeOrder(invoice, changeOrder, approvedBy) {
   if (!approvedBy) throw new Error('a change order needs a human approver (approvedBy)');
-  if (invoice.status === 'approved') {
-    throw new Error('cannot approve a change order: the invoice is already approved — the approved sum is frozen; only a new invoice can change it');
+  // Only a 'quoted' invoice can take a change order. An approved invoice
+  // has its sum FROZEN, and a paid invoice is closed — either way only a
+  // new invoice can change the approved sum. The guard throws BEFORE any
+  // mutation, so a rejected change order leaves the invoice untouched.
+  if (invoice.status !== 'quoted') {
+    const why = invoice.status === 'approved'
+      ? 'the invoice is already approved'
+      : invoice.status === 'paid'
+        ? 'the invoice is already paid'
+        : `the invoice is in status "${invoice.status}"`;
+    throw new Error(`cannot approve a change order: ${why} — the approved sum is frozen; only a new invoice can change it`);
   }
   const co = { description: changeOrder.description || 'change order', amountCents: Math.round(Number(changeOrder.amountCents) || 0), approvedBy };
   invoice.changeOrders.push(co);
@@ -142,9 +151,19 @@ function approveChangeOrder(invoice, changeOrder, approvedBy) {
 // old total, so the invoice goes back to 'quoted', the approver is
 // cleared, and the clerk check is cleared — the invoice must be re-checked
 // and re-approved before it can be paid.
+//
+// A correction is REFUSED on a paid invoice (closed): rewriting its total
+// after the contractor was paid would corrupt the desk record. A
+// funded-but-unreleased invoice still shows clerk status 'approved'; the
+// server refuses those too — the ledger void throws for a Funded escrow
+// before the clerk mutates — because the clerk cannot see funding.
 function correctInvoiceTotal(invoice, correctedTotalCents, correctedBy, note) {
   if (!correctedBy) throw new Error('a correction needs a human (correctedBy)');
+  if (invoice.status !== 'quoted' && invoice.status !== 'approved') {
+    throw new Error(`cannot correct an invoice in status "${invoice.status}" — the invoice is already ${invoice.status}; only a new invoice can change it`);
+  }
   const target = Math.round(Number(correctedTotalCents));
+  if (!Number.isFinite(target)) throw new Error('a correction needs a numeric correctedTotalCents');
   const delta = target - invoice.totalCents;
   if (delta >= 0) throw new Error('a correction must lower the total; use a change order to raise it');
   invoice.changeOrders.push({ description: note || 'human correction', amountCents: delta, approvedBy: correctedBy });

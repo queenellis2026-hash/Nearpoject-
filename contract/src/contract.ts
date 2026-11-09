@@ -195,11 +195,11 @@ export class PaidInFull {
 // 1. Status-before-transfer: release/cancel set the invoice status to its
 //    terminal state BEFORE creating the async transfer promise, with no
 //    callback and no withdraw/rescue function. If a transfer failed, the
-//    funds would strand in the contract. The failure path is essentially
-//    closed by create_invoice's account validation (the contractor and
-//    client are validated as real-format NEAR account ids, so the transfer
-//    target always exists), but a failed transfer would still strand
-//    funds. A rescue function is out of scope for this version.
+//    funds would strand in the contract. create_invoice's account
+//    validation only checks the FORMAT of the contractor and client ids —
+//    it does not prove those accounts exist on-chain, so a release to a
+//    well-formed but never-created account would still fail and strand
+//    the funds. A rescue function is out of scope for this version.
 //
 // 2. No expiry: invoices never expire, so a Created invoice can be
 //    approved and funded arbitrarily late. The approval gate means a stale

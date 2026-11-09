@@ -11,7 +11,7 @@ Chris confirms the exact payload first; only then is it sent, once, before
 |---|---|---|
 | `[TEAM LEAD NAME]` | Chris's name as team lead | 2–80 characters |
 | `[CONTACT EMAIL]` | Email the organizers may contact | valid email, max 160 chars, max 2 submissions per email |
-| `[MAINNET NEAR PAYOUT ADDRESS]` | The mainnet NEAR account Chris creates himself in a NEAR wallet | 2–64 chars, lowercase, e.g. `name.near`. **An agent must never create or invent this.** |
+| `[MAINNET NEAR PAYOUT ADDRESS]` — SETTLED, no longer needed from Chris | The team's existing mainnet implicit NEAR account: `335da30a9441d8b689e62fef1d01383b24a980dabcef726898536e23d1f1204d` (Chris was released from creating an account) | 64 chars, lowercase hex. |
 | `[PUBLIC REPO URL]` | The public GitHub URL of this repository — verified live Nov 9, 2026: https://github.com/queenellis2026-hash/Nearpoject- (public, returns 200; repo name is `Nearpoject-`, exact) | http(s), max 300 chars; each repo can be submitted only once |
 | `[X POST URL]` | URL of the demo post Chris publishes on X (see `x-post-draft.md`) | http(s), max 300 chars |
 
@@ -27,7 +27,7 @@ Team size is drafted as `2 - 4` (Chris + the agents working under his direction)
   "email": "[CONTACT EMAIL]",
   "size": "2 - 4",
   "tracks": ["realworld", "business", "agents"],
-  "nearAddress": "[MAINNET NEAR PAYOUT ADDRESS]",
+  "nearAddress": "335da30a9441d8b689e62fef1d01383b24a980dabcef726898536e23d1f1204d",
   "projectUrl": "https://github.com/queenellis2026-hash/Nearpoject-",
   "demoUrl": "[X POST URL]",
   "idea": "Contractors lose money in the gap between finishing a job and getting paid, and invoices quietly grow past the price the customer approved. Paid in Full is an invoice-to-payment desk for small crews. An agent clerk prepares the invoice from the job's line items, checks it against the approved contract sum, and flags any overage before a dollar moves; a flagged invoice cannot be approved or paid until a human resolves it, and a human approval is required before any payment. On NEAR: a testnet escrow contract records the client at invoice creation; only that client can approve, and approval sets an approved-sum cap — a cap below the invoice amount fails fast at approval with a clear error and records nothing, so the client retries with a correct cap; funding then requires the approval, the recorded client, and a deposit exactly equal to the invoice amount and at or under the cap, and releases to the contractor only on the client's release. The client can cancel an unfunded invoice with no funds moving; there is no on-chain change order that raises the cap after approval — a wrong amount means a corrected invoice. NEAR Intents dry quotes (dry: true, no funds moved) show what the payment would settle to cross-chain. The local demo runs with no wallet: npm test, then ./run-demo.sh. Built November 8-14, 2026 for NEAR HACKATHON. Tracks: realworld (invoicing on crypto rails), business (payments within human-set limits), agents (an agent that prepares and checks, a human who decides).",

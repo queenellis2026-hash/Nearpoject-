@@ -324,19 +324,31 @@ function initWalletUI() {
   }
 
   // Runs one built call, then reads the invoice back live and shows both
-  // the transaction hash and the new on-chain state.
-  async function runLive(call, label) {
+  // the transaction hash and the new on-chain state. The success label
+  // comes from the READ-BACK invoice — labelFor is a function taking the
+  // read-back invoice and returning the label — never from the Amount
+  // field. The field is what the user asked to move; the read-back is what
+  // actually moved, and the two can differ if the field was edited between
+  // steps. labelFor may also be a plain string when the label makes no
+  // amount claim (e.g. cancel). If the read-back fails, no amount is
+  // claimed at all.
+  async function runLive(call, labelFor) {
     out(`<p>Signing <code>${call.methodName}</code> in your wallet…</p>`);
     try {
       const hash = await callContract(call);
       const id = $('liveInvoiceId').value.trim();
       let stateHtml = '';
+      let label;
       try {
         const inv = await viewInvoiceLive(id);
         stateHtml = `<p>On-chain state after this transaction: <span class="status">${inv.status}</span>` +
           ` — approved: ${inv.approved ? 'yes' : 'no'}, cap ${yoctoToNear(inv.approvedSumYocto)} NEAR, ` +
           `amount ${yoctoToNear(inv.amountYocto)} NEAR.</p>`;
-      } catch (e) { stateHtml = `<p>Transaction landed, but the live read-back failed: ${e.message}</p>`; }
+        label = typeof labelFor === 'function' ? labelFor(inv) : labelFor;
+      } catch (e) {
+        stateHtml = `<p>Transaction landed, but the live read-back failed: ${e.message}</p>`;
+        label = 'Transaction landed — amount not confirmed (live read-back failed).';
+      }
       out(`<p class="ok">${label}</p>` + txLink(hash) + stateHtml);
     } catch (e) { showError(e); }
   }
@@ -360,7 +372,7 @@ function initWalletUI() {
         client: accountId,
         amountNear: $('liveAmount').value,
       });
-      await runLive(call, `Live invoice ${$('liveInvoiceId').value.trim()} created on-chain for ${$('liveAmount').value} NEAR (small testnet amount). Client: ${accountId}.`);
+      await runLive(call, (inv) => `Live invoice ${inv.invoice_id} created on-chain for ${yoctoToNear(inv.amountYocto)} NEAR (small testnet amount). Client: ${inv.client}.`);
     } catch (e) { showError(e); }
   });
 
@@ -371,7 +383,7 @@ function initWalletUI() {
         capNear: $('liveAmount').value,
         amountNear: $('liveAmount').value,
       });
-      await runLive(call, `Approved on-chain up to ${$('liveAmount').value} NEAR (cap = amount).`);
+      await runLive(call, (inv) => `Approved on-chain up to ${yoctoToNear(inv.approvedSumYocto)} NEAR.`);
     } catch (e) { showError(e); }
   });
 
@@ -381,14 +393,14 @@ function initWalletUI() {
         invoiceId: $('liveInvoiceId').value.trim(),
         amountNear: $('liveAmount').value,
       });
-      await runLive(call, `Funded on-chain with exactly ${$('liveAmount').value} NEAR (deposit = invoice amount, to the yocto).`);
+      await runLive(call, (inv) => `Funded on-chain with exactly ${yoctoToNear(inv.amountYocto)} NEAR (deposit = invoice amount, to the yocto).`);
     } catch (e) { showError(e); }
   });
 
   $('liveRelease').addEventListener('click', async () => {
     try {
       await runLive(buildRelease({ invoiceId: $('liveInvoiceId').value.trim() }),
-        `Released on-chain — ${$('liveAmount').value} NEAR moved to the contractor.`);
+        (inv) => `Released on-chain — ${yoctoToNear(inv.amountYocto)} NEAR moved to the contractor.`);
     } catch (e) { showError(e); }
   });
 

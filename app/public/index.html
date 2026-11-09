@@ -54,8 +54,9 @@
   <h2>3. Resolve &amp; <span class="actor-human">human approval</span></h2>
   <p>If the clerk flags an overage, a human either corrects the invoice or approves a change
      order that raises the approved sum — before approval. Once the client approves, the
-     approved sum is frozen; only a new invoice can change it. The clerk then re-checks.
-     Nothing is payable before a human approves.</p>
+     approved sum is frozen; on-chain, only a new invoice can change it. (In this simulated
+     desk, a correction re-uses the same invoice id — the one place the sim differs from the
+     chain.) The clerk then re-checks. Nothing is payable before a human approves.</p>
   <label>Corrected invoice total (USD) <input id="correctedTotal" type="number" value="12000"></label>
   <button onclick="correct()">Human: correct invoice to this total</button>
   <label>Change order — description <input id="coDesc" value="Drain reroute — approved as extra work"></label>
@@ -84,7 +85,7 @@
   <p class="explorer">Escrow contract live on NEAR testnet: <a href="https://explorer.testnet.near.org/accounts/paid-in-full-v3.testnet" target="_blank" rel="noopener">paid-in-full-v3.testnet</a><br>
   Deploy transaction: <a href="https://explorer.testnet.near.org/transactions/8e3kfhWMRHqijsMDMb2BgS8n5tkvmi1gNXJci2XyPKMx" target="_blank" rel="noopener"><code>8e3kfhWMRHqijsMDMb2BgS8n5tkvmi1gNXJci2XyPKMx</code></a><br>
   Code hash: <code>Fopmv4Gpcark4EDU9ir9yWApFwbJSDVD9VMT2nycPpjD</code><br>
-  The demo above is a local simulation of that contract — same states, same rules, no real funds.</p>
+  The demo above is a local simulation of that contract — same states and rules, no real funds. One difference: the sim re-uses the same invoice id when an invoice is corrected; on-chain, a corrected invoice needs a new id.</p>
 </section>
 
 <section>

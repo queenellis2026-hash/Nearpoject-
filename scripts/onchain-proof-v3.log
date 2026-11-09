@@ -1,0 +1,811 @@
+View call: paid-in-full-v3.testnet.invoice_ids({})
+[]
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- create inv-3001 ---
+Scheduling a call: paid-in-full-v3.testnet.create_invoice({"invoice_id":"inv-3001","job":"Bathroom remodel — final invoice","contractor":"crew.paid-in-full-v3.testnet","client":"paid-in-full-v3.testnet","amount_yocto":"10000000000000000000000"})
+Receipt: 5orKYyv8V9iweLZ3AxScZUxRnirvBLX8y9gwAE9spfgi
+	Log [paid-in-full-v3.testnet]: invoice inv-3001 created: Bathroom remodel — final invoice, amount 10000000000000000000000 yocto, client paid-in-full-v3.testnet
+Transaction Id HqDzfZ7HHuUJpSXEwfhuj1xJL1BHTfg21e6TnV36gaBc
+Open the explorer for more info: https://testnet.nearblocks.io/txns/HqDzfZ7HHuUJpSXEwfhuj1xJL1BHTfg21e6TnV36gaBc
+''
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+View call: paid-in-full-v3.testnet.get_invoice({"invoice_id":"inv-3001"})
+{
+  job: 'Bathroom remodel — final invoice',
+  contractor: 'crew.paid-in-full-v3.testnet',
+  client: 'paid-in-full-v3.testnet',
+  amountYocto: '10000000000000000000000',
+  status: 'Created',
+  approved: false,
+  approvedSumYocto: '0'
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- NEGATIVE: fund without client_approve (must fail) ---
+Scheduling a call: paid-in-full-v3.testnet.approve_and_fund({"invoice_id":"inv-3001"}) with attached 0.01 NEAR
+Receipts: uTWFcU91ABswbGScmgBqkEYSGANF9Y4qKo5cv4QHTUR, CWoxJcj8hm5WXgDBUgfcWaNiGTRFmVSdb3qmNhXfP58o
+	Failure [paid-in-full-v3.testnet]: Error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: invoice must be approved by the client before funding (call client_approve first)\n    at assert (build/paid-in-full.js:2229)\n    at approve_and_fund (build/paid-in-full.js:3078)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at approve_and_fund (build/paid-in-full.js:3219)\n"}}}}
+near call <contractName> <methodName> [args]
+
+Call method in smart contract
+
+Options:
+      --help                            Show help  [boolean]
+      --version                         Show version number  [boolean]
+  -v, --verbose                         Prints out verbose output  [boolean] [default: false]
+      --useAccount, --accountId         Account that will execute the actions  [string] [required]
+      --signWithLedger, --useLedgerKey  Use Ledger for signing  [boolean] [default: false]
+      --ledgerPath                      HD key path  [string] [default: "44'/397'/0'/0'/1'"]
+      --networkId                       Which network to use. Supports: mainnet, testnet, custom  [string] [default: "testnet"]
+      --gas                             Max amount of gas this call can use (in gas units)  [string] [default: 30000000000000]
+      --deposit, --amount               Number of tokens to attach (in NEAR) to a function call  [string] [default: "0"]
+      --depositYocto                    Number of tokens to attach (in yocto NEAR) to a function call  [string] [default: null]
+      --base64                          Treat arguments as base64-encoded BLOB.  [boolean] [default: false]
+      --privateKey                      AccessKey to use in the call  [string] [default: null]
+
+ServerTransactionError: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: invoice must be approved by the client before funding (call client_approve first)\n    at assert (build/paid-in-full.js:2229)\n    at approve_and_fund (build/paid-in-full.js:3078)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at approve_and_fund (build/paid-in-full.js:3219)\n"}}}}
+    at parseResultError (/usr/lib/node_modules/near-cli/node_modules/@near-js/utils/lib/errors/rpc_errors.js:31:29)
+    at Account.<anonymous> (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:123:56)
+    at Generator.next (<anonymous>)
+    at fulfilled (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:5:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'ActionError',
+  context: undefined,
+  index: 0,
+  kind: { index: 0, kind: { FunctionCallError: [Object] } },
+  transaction_outcome: {
+    block_hash: '7BY6TeZKwdv8ou8VNrnTLr6x6zGc5VikN7bUe7bMjQqC',
+    id: '3cNNNuvwZVwRULxm5WekyaXjAaRycmz9VLDEHkApGm1q',
+    outcome: {
+      executor_id: 'paid-in-full-v3.testnet',
+      gas_burnt: 308151173294,
+      logs: [],
+      metadata: [Object],
+      receipt_ids: [Array],
+      status: [Object],
+      tokens_burnt: '30815117329400000000'
+    },
+    proof: [ [Object], [Object] ]
+  }
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+View call: paid-in-full-v3.testnet.get_invoice({"invoice_id":"inv-3001"})
+{
+  job: 'Bathroom remodel — final invoice',
+  contractor: 'crew.paid-in-full-v3.testnet',
+  client: 'paid-in-full-v3.testnet',
+  amountYocto: '10000000000000000000000',
+  status: 'Created',
+  approved: false,
+  approvedSumYocto: '0'
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- NEGATIVE: stranger client_approve (must fail) ---
+Scheduling a call: paid-in-full-v3.testnet.client_approve({"invoice_id":"inv-3001","approved_sum_yocto":"10000000000000000000000"})
+Receipt: Hc9P9Q7fv2L9VgwhYz1M5eM6oNYPRcTNxg21rAqS3SFL
+	Failure [paid-in-full-v3.testnet]: Error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: only the recorded client can approve this invoice\n    at assert (build/paid-in-full.js:2229)\n    at client_approve (build/paid-in-full.js:3064)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at client_approve (build/paid-in-full.js:3233)\n"}}}}
+near call <contractName> <methodName> [args]
+
+Call method in smart contract
+
+Options:
+      --help                            Show help  [boolean]
+      --version                         Show version number  [boolean]
+  -v, --verbose                         Prints out verbose output  [boolean] [default: false]
+      --useAccount, --accountId         Account that will execute the actions  [string] [required]
+      --signWithLedger, --useLedgerKey  Use Ledger for signing  [boolean] [default: false]
+      --ledgerPath                      HD key path  [string] [default: "44'/397'/0'/0'/1'"]
+      --networkId                       Which network to use. Supports: mainnet, testnet, custom  [string] [default: "testnet"]
+      --gas                             Max amount of gas this call can use (in gas units)  [string] [default: 30000000000000]
+      --deposit, --amount               Number of tokens to attach (in NEAR) to a function call  [string] [default: "0"]
+      --depositYocto                    Number of tokens to attach (in yocto NEAR) to a function call  [string] [default: null]
+      --base64                          Treat arguments as base64-encoded BLOB.  [boolean] [default: false]
+      --privateKey                      AccessKey to use in the call  [string] [default: null]
+
+ServerTransactionError: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: only the recorded client can approve this invoice\n    at assert (build/paid-in-full.js:2229)\n    at client_approve (build/paid-in-full.js:3064)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at client_approve (build/paid-in-full.js:3233)\n"}}}}
+    at parseResultError (/usr/lib/node_modules/near-cli/node_modules/@near-js/utils/lib/errors/rpc_errors.js:31:29)
+    at Account.<anonymous> (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:123:56)
+    at Generator.next (<anonymous>)
+    at fulfilled (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:5:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'ActionError',
+  context: undefined,
+  index: 0,
+  kind: { index: 0, kind: { FunctionCallError: [Object] } },
+  transaction_outcome: {
+    block_hash: '96NNUb9rHXKEBUYvMZV5EqB38jNqqeW3uHsZmsEMaPrG',
+    id: '9ihzpn7RSN4SwustsGK3CQF2cuuS5bceT8SzZ1gYH7rv',
+    outcome: {
+      executor_id: 'stranger.paid-in-full-v3.testnet',
+      gas_burnt: 312160299490,
+      logs: [],
+      metadata: [Object],
+      receipt_ids: [Array],
+      status: [Object],
+      tokens_burnt: '31216029949000000000'
+    },
+    proof: [ [Object], [Object] ]
+  }
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- client_approve inv-3001 (0.01 cap) ---
+Scheduling a call: paid-in-full-v3.testnet.client_approve({"invoice_id":"inv-3001","approved_sum_yocto":"10000000000000000000000"})
+Receipt: FmwQBJfQCt9KGySkB8kRdijqmNfYREB8vvP5b4spBDfX
+	Log [paid-in-full-v3.testnet]: invoice inv-3001 approved by client paid-in-full-v3.testnet up to 10000000000000000000000 yocto
+Transaction Id 9d6YnD5XRD2kPxn7Ye1wm9eBCcPcob3NegiDndU6dNVw
+Open the explorer for more info: https://testnet.nearblocks.io/txns/9d6YnD5XRD2kPxn7Ye1wm9eBCcPcob3NegiDndU6dNVw
+''
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+View call: paid-in-full-v3.testnet.get_invoice({"invoice_id":"inv-3001"})
+{
+  job: 'Bathroom remodel — final invoice',
+  contractor: 'crew.paid-in-full-v3.testnet',
+  client: 'paid-in-full-v3.testnet',
+  amountYocto: '10000000000000000000000',
+  status: 'Created',
+  approved: true,
+  approvedSumYocto: '10000000000000000000000'
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- NEGATIVE: stranger approve_and_fund (must fail) ---
+Scheduling a call: paid-in-full-v3.testnet.approve_and_fund({"invoice_id":"inv-3001"}) with attached 0.01 NEAR
+Receipts: 3KCkFB2RcFP4gkYnZMBAveCoVx3VmFo383qiVVePvnPT, 5fs1rsHdbcKoGrQrraVsa4ubkDiwEYGKQ1V3hbDUwWVD
+	Failure [paid-in-full-v3.testnet]: Error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: only the recorded client can fund this invoice\n    at assert (build/paid-in-full.js:2229)\n    at approve_and_fund (build/paid-in-full.js:3079)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at approve_and_fund (build/paid-in-full.js:3219)\n"}}}}
+near call <contractName> <methodName> [args]
+
+Call method in smart contract
+
+Options:
+      --help                            Show help  [boolean]
+      --version                         Show version number  [boolean]
+  -v, --verbose                         Prints out verbose output  [boolean] [default: false]
+      --useAccount, --accountId         Account that will execute the actions  [string] [required]
+      --signWithLedger, --useLedgerKey  Use Ledger for signing  [boolean] [default: false]
+      --ledgerPath                      HD key path  [string] [default: "44'/397'/0'/0'/1'"]
+      --networkId                       Which network to use. Supports: mainnet, testnet, custom  [string] [default: "testnet"]
+      --gas                             Max amount of gas this call can use (in gas units)  [string] [default: 30000000000000]
+      --deposit, --amount               Number of tokens to attach (in NEAR) to a function call  [string] [default: "0"]
+      --depositYocto                    Number of tokens to attach (in yocto NEAR) to a function call  [string] [default: null]
+      --base64                          Treat arguments as base64-encoded BLOB.  [boolean] [default: false]
+      --privateKey                      AccessKey to use in the call  [string] [default: null]
+
+ServerTransactionError: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: only the recorded client can fund this invoice\n    at assert (build/paid-in-full.js:2229)\n    at approve_and_fund (build/paid-in-full.js:3079)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at approve_and_fund (build/paid-in-full.js:3219)\n"}}}}
+    at parseResultError (/usr/lib/node_modules/near-cli/node_modules/@near-js/utils/lib/errors/rpc_errors.js:31:29)
+    at Account.<anonymous> (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:123:56)
+    at Generator.next (<anonymous>)
+    at fulfilled (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:5:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'ActionError',
+  context: undefined,
+  index: 0,
+  kind: { index: 0, kind: { FunctionCallError: [Object] } },
+  transaction_outcome: {
+    block_hash: 'CSmr2PFSgVKziwp1FwE7vgG2wjk628w9oUpqkxzvK2GP',
+    id: '5zs27htp4tbHV3iKc3pYSut6Jdt6kMAy5GCoAkxww7Zx',
+    outcome: {
+      executor_id: 'stranger.paid-in-full-v3.testnet',
+      gas_burnt: 310014532315,
+      logs: [],
+      metadata: [Object],
+      receipt_ids: [Array],
+      status: [Object],
+      tokens_burnt: '31001453231500000000'
+    },
+    proof: [ [Object], [Object], [Object] ]
+  }
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- NEGATIVE: client funds with WRONG amount 0.02 (must fail) ---
+Scheduling a call: paid-in-full-v3.testnet.approve_and_fund({"invoice_id":"inv-3001"}) with attached 0.02 NEAR
+Receipts: C55WL5HV7FPV2YjCiyTpoUGWFaYgRsBEDeoANg4KLcYW, HZVFFomMBUcNHn26MWgBBm76GYqp192Ta3g7YPbssPAd
+	Failure [paid-in-full-v3.testnet]: Error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: attached deposit must equal the invoice amount exactly\n    at assert (build/paid-in-full.js:2229)\n    at approve_and_fund (build/paid-in-full.js:3082)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at approve_and_fund (build/paid-in-full.js:3219)\n"}}}}
+near call <contractName> <methodName> [args]
+
+Call method in smart contract
+
+Options:
+      --help                            Show help  [boolean]
+      --version                         Show version number  [boolean]
+  -v, --verbose                         Prints out verbose output  [boolean] [default: false]
+      --useAccount, --accountId         Account that will execute the actions  [string] [required]
+      --signWithLedger, --useLedgerKey  Use Ledger for signing  [boolean] [default: false]
+      --ledgerPath                      HD key path  [string] [default: "44'/397'/0'/0'/1'"]
+      --networkId                       Which network to use. Supports: mainnet, testnet, custom  [string] [default: "testnet"]
+      --gas                             Max amount of gas this call can use (in gas units)  [string] [default: 30000000000000]
+      --deposit, --amount               Number of tokens to attach (in NEAR) to a function call  [string] [default: "0"]
+      --depositYocto                    Number of tokens to attach (in yocto NEAR) to a function call  [string] [default: null]
+      --base64                          Treat arguments as base64-encoded BLOB.  [boolean] [default: false]
+      --privateKey                      AccessKey to use in the call  [string] [default: null]
+
+ServerTransactionError: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: attached deposit must equal the invoice amount exactly\n    at assert (build/paid-in-full.js:2229)\n    at approve_and_fund (build/paid-in-full.js:3082)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at approve_and_fund (build/paid-in-full.js:3219)\n"}}}}
+    at parseResultError (/usr/lib/node_modules/near-cli/node_modules/@near-js/utils/lib/errors/rpc_errors.js:31:29)
+    at Account.<anonymous> (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:123:56)
+    at Generator.next (<anonymous>)
+    at fulfilled (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:5:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'ActionError',
+  context: undefined,
+  index: 0,
+  kind: { index: 0, kind: { FunctionCallError: [Object] } },
+  transaction_outcome: {
+    block_hash: 'FFNbpxm9VtEPYQsvZQ68HBJtKuBVBeXHJoh9U5nw93Ea',
+    id: 'GxrAo8iMcmC9ETszMxygVhsFmMMH9HrApUxJPM37EohC',
+    outcome: {
+      executor_id: 'paid-in-full-v3.testnet',
+      gas_burnt: 308151173294,
+      logs: [],
+      metadata: [Object],
+      receipt_ids: [Array],
+      status: [Object],
+      tokens_burnt: '30815117329400000000'
+    },
+    proof: [ [Object], [Object], [Object] ]
+  }
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- fund inv-3001 (0.01) ---
+Scheduling a call: paid-in-full-v3.testnet.approve_and_fund({"invoice_id":"inv-3001"}) with attached 0.01 NEAR
+Receipt: Gg9EQkaYwXpZw1t9EeGdpQcNfAEZK9GyVV4nTnNF477W
+	Log [paid-in-full-v3.testnet]: invoice inv-3001 approved and funded by paid-in-full-v3.testnet
+Transaction Id A9AoJ3r4R8Mti8jCt5NemmEnHcp5LFnnmhshxmMLJKUd
+Open the explorer for more info: https://testnet.nearblocks.io/txns/A9AoJ3r4R8Mti8jCt5NemmEnHcp5LFnnmhshxmMLJKUd
+''
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+View call: paid-in-full-v3.testnet.get_invoice({"invoice_id":"inv-3001"})
+{
+  job: 'Bathroom remodel — final invoice',
+  contractor: 'crew.paid-in-full-v3.testnet',
+  client: 'paid-in-full-v3.testnet',
+  amountYocto: '10000000000000000000000',
+  status: 'Funded',
+  approved: true,
+  approvedSumYocto: '10000000000000000000000'
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- NEGATIVE: stranger release (must fail) ---
+Scheduling a call: paid-in-full-v3.testnet.release({"invoice_id":"inv-3001"})
+Receipt: 2EaZBY3SRRUN8mi99s36QLpACrWWTdfHMoMsL2USUXVr
+	Failure [paid-in-full-v3.testnet]: Error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: only the client who funded this invoice can release it\n    at assert (build/paid-in-full.js:2229)\n    at release (build/paid-in-full.js:3092)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at release (build/paid-in-full.js:3205)\n"}}}}
+near call <contractName> <methodName> [args]
+
+Call method in smart contract
+
+Options:
+      --help                            Show help  [boolean]
+      --version                         Show version number  [boolean]
+  -v, --verbose                         Prints out verbose output  [boolean] [default: false]
+      --useAccount, --accountId         Account that will execute the actions  [string] [required]
+      --signWithLedger, --useLedgerKey  Use Ledger for signing  [boolean] [default: false]
+      --ledgerPath                      HD key path  [string] [default: "44'/397'/0'/0'/1'"]
+      --networkId                       Which network to use. Supports: mainnet, testnet, custom  [string] [default: "testnet"]
+      --gas                             Max amount of gas this call can use (in gas units)  [string] [default: 30000000000000]
+      --deposit, --amount               Number of tokens to attach (in NEAR) to a function call  [string] [default: "0"]
+      --depositYocto                    Number of tokens to attach (in yocto NEAR) to a function call  [string] [default: null]
+      --base64                          Treat arguments as base64-encoded BLOB.  [boolean] [default: false]
+      --privateKey                      AccessKey to use in the call  [string] [default: null]
+
+ServerTransactionError: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: only the client who funded this invoice can release it\n    at assert (build/paid-in-full.js:2229)\n    at release (build/paid-in-full.js:3092)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at release (build/paid-in-full.js:3205)\n"}}}}
+    at parseResultError (/usr/lib/node_modules/near-cli/node_modules/@near-js/utils/lib/errors/rpc_errors.js:31:29)
+    at Account.<anonymous> (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:123:56)
+    at Generator.next (<anonymous>)
+    at fulfilled (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:5:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'ActionError',
+  context: undefined,
+  index: 0,
+  kind: { index: 0, kind: { FunctionCallError: [Object] } },
+  transaction_outcome: {
+    block_hash: 'GJ3G7PpsMQkcZD5qrr5ZUi8kjbmcgeVjGLWFrP5nxr2B',
+    id: 'CYtiQgqdSSSz9nKV6CAkjkLpXHuwyEZLoUf7LmFzX2o',
+    outcome: {
+      executor_id: 'stranger.paid-in-full-v3.testnet',
+      gas_burnt: 309585378880,
+      logs: [],
+      metadata: [Object],
+      receipt_ids: [Array],
+      status: [Object],
+      tokens_burnt: '30958537888000000000'
+    },
+    proof: [ [Object], [Object] ]
+  }
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- NEGATIVE: fund twice (must fail) ---
+Scheduling a call: paid-in-full-v3.testnet.approve_and_fund({"invoice_id":"inv-3001"}) with attached 0.01 NEAR
+Receipts: HApUDkjTqhA9B9DehXG215gJPqQ6jrntpwQtSUaoTF8c, 6Cs8y1nY4GHKSEDiDnwUjke3DzxjapjCX5LHPyoQ4FsV
+	Failure [paid-in-full-v3.testnet]: Error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: cannot fund an invoice in status Funded\n    at assert (build/paid-in-full.js:2229)\n    at approve_and_fund (build/paid-in-full.js:3077)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at approve_and_fund (build/paid-in-full.js:3219)\n"}}}}
+near call <contractName> <methodName> [args]
+
+Call method in smart contract
+
+Options:
+      --help                            Show help  [boolean]
+      --version                         Show version number  [boolean]
+  -v, --verbose                         Prints out verbose output  [boolean] [default: false]
+      --useAccount, --accountId         Account that will execute the actions  [string] [required]
+      --signWithLedger, --useLedgerKey  Use Ledger for signing  [boolean] [default: false]
+      --ledgerPath                      HD key path  [string] [default: "44'/397'/0'/0'/1'"]
+      --networkId                       Which network to use. Supports: mainnet, testnet, custom  [string] [default: "testnet"]
+      --gas                             Max amount of gas this call can use (in gas units)  [string] [default: 30000000000000]
+      --deposit, --amount               Number of tokens to attach (in NEAR) to a function call  [string] [default: "0"]
+      --depositYocto                    Number of tokens to attach (in yocto NEAR) to a function call  [string] [default: null]
+      --base64                          Treat arguments as base64-encoded BLOB.  [boolean] [default: false]
+      --privateKey                      AccessKey to use in the call  [string] [default: null]
+
+ServerTransactionError: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: cannot fund an invoice in status Funded\n    at assert (build/paid-in-full.js:2229)\n    at approve_and_fund (build/paid-in-full.js:3077)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at approve_and_fund (build/paid-in-full.js:3219)\n"}}}}
+    at parseResultError (/usr/lib/node_modules/near-cli/node_modules/@near-js/utils/lib/errors/rpc_errors.js:31:29)
+    at Account.<anonymous> (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:123:56)
+    at Generator.next (<anonymous>)
+    at fulfilled (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:5:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'ActionError',
+  context: undefined,
+  index: 0,
+  kind: { index: 0, kind: { FunctionCallError: [Object] } },
+  transaction_outcome: {
+    block_hash: 'biaZm4hknBkVwdsTjMssgq86BQ8quvrZB8hz9vA2Ltk',
+    id: 'Ejkgx2kV4hszSnyETMut2YSkmqw2bun9fsD11RZUaPav',
+    outcome: {
+      executor_id: 'paid-in-full-v3.testnet',
+      gas_burnt: 308151173294,
+      logs: [],
+      metadata: [Object],
+      receipt_ids: [Array],
+      status: [Object],
+      tokens_burnt: '30815117329400000000'
+    },
+    proof: [ [Object], [Object] ]
+  }
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- release inv-3001 ---
+Scheduling a call: paid-in-full-v3.testnet.release({"invoice_id":"inv-3001"})
+Receipts: 2uZHrvVvvMKCttokHwuqXAvaZdBZE2ZGy3dGqCZ8CMeH, BXXfzCNATDiDsNxmbiCDt5DkjgxiuLp7fLqqk34TscX6
+	Log [paid-in-full-v3.testnet]: invoice inv-3001 released to crew.paid-in-full-v3.testnet
+Transaction Id AK6xur6aWs72WEZfg4diCUMZqCHEU7rYnHbGosADVxGa
+Open the explorer for more info: https://testnet.nearblocks.io/txns/AK6xur6aWs72WEZfg4diCUMZqCHEU7rYnHbGosADVxGa
+''
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+View call: paid-in-full-v3.testnet.get_invoice({"invoice_id":"inv-3001"})
+{
+  job: 'Bathroom remodel — final invoice',
+  contractor: 'crew.paid-in-full-v3.testnet',
+  client: 'paid-in-full-v3.testnet',
+  amountYocto: '10000000000000000000000',
+  status: 'Released',
+  approved: true,
+  approvedSumYocto: '10000000000000000000000'
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- NEGATIVE: release twice (must fail) ---
+Scheduling a call: paid-in-full-v3.testnet.release({"invoice_id":"inv-3001"})
+Receipt: HgZePJDSbeRwhhvMqrRtLgD1u8SRvqG4Q9aLXvoXwkeW
+	Failure [paid-in-full-v3.testnet]: Error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: cannot release an invoice in status Released\n    at assert (build/paid-in-full.js:2229)\n    at release (build/paid-in-full.js:3091)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at release (build/paid-in-full.js:3205)\n"}}}}
+near call <contractName> <methodName> [args]
+
+Call method in smart contract
+
+Options:
+      --help                            Show help  [boolean]
+      --version                         Show version number  [boolean]
+  -v, --verbose                         Prints out verbose output  [boolean] [default: false]
+      --useAccount, --accountId         Account that will execute the actions  [string] [required]
+      --signWithLedger, --useLedgerKey  Use Ledger for signing  [boolean] [default: false]
+      --ledgerPath                      HD key path  [string] [default: "44'/397'/0'/0'/1'"]
+      --networkId                       Which network to use. Supports: mainnet, testnet, custom  [string] [default: "testnet"]
+      --gas                             Max amount of gas this call can use (in gas units)  [string] [default: 30000000000000]
+      --deposit, --amount               Number of tokens to attach (in NEAR) to a function call  [string] [default: "0"]
+      --depositYocto                    Number of tokens to attach (in yocto NEAR) to a function call  [string] [default: null]
+      --base64                          Treat arguments as base64-encoded BLOB.  [boolean] [default: false]
+      --privateKey                      AccessKey to use in the call  [string] [default: null]
+
+ServerTransactionError: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: cannot release an invoice in status Released\n    at assert (build/paid-in-full.js:2229)\n    at release (build/paid-in-full.js:3091)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at release (build/paid-in-full.js:3205)\n"}}}}
+    at parseResultError (/usr/lib/node_modules/near-cli/node_modules/@near-js/utils/lib/errors/rpc_errors.js:31:29)
+    at Account.<anonymous> (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:123:56)
+    at Generator.next (<anonymous>)
+    at fulfilled (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:5:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'ActionError',
+  context: undefined,
+  index: 0,
+  kind: { index: 0, kind: { FunctionCallError: [Object] } },
+  transaction_outcome: {
+    block_hash: 'CQmK9DSwKPJEx9z1vNH4TaojrgaFAQtd4x66fhYUxG4a',
+    id: '4nEkZ9eVJbEaMPRbRF8GCnU1fqxmk1cbn5TsAbeL8ovc',
+    outcome: {
+      executor_id: 'paid-in-full-v3.testnet',
+      gas_burnt: 308131049888,
+      logs: [],
+      metadata: [Object],
+      receipt_ids: [Array],
+      status: [Object],
+      tokens_burnt: '30813104988800000000'
+    },
+    proof: [ [Object] ]
+  }
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- NEGATIVE: cancel after release (must fail) ---
+Scheduling a call: paid-in-full-v3.testnet.cancel({"invoice_id":"inv-3001"})
+Receipt: 4GYTF8K3cwderkU3hgYU1gWntNdqXCE1TvCg3EKLF56P
+	Failure [paid-in-full-v3.testnet]: Error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: cannot cancel an invoice in status Released\n    at assert (build/paid-in-full.js:2229)\n    at cancel (build/paid-in-full.js:3107)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at cancel (build/paid-in-full.js:3191)\n"}}}}
+near call <contractName> <methodName> [args]
+
+Call method in smart contract
+
+Options:
+      --help                            Show help  [boolean]
+      --version                         Show version number  [boolean]
+  -v, --verbose                         Prints out verbose output  [boolean] [default: false]
+      --useAccount, --accountId         Account that will execute the actions  [string] [required]
+      --signWithLedger, --useLedgerKey  Use Ledger for signing  [boolean] [default: false]
+      --ledgerPath                      HD key path  [string] [default: "44'/397'/0'/0'/1'"]
+      --networkId                       Which network to use. Supports: mainnet, testnet, custom  [string] [default: "testnet"]
+      --gas                             Max amount of gas this call can use (in gas units)  [string] [default: 30000000000000]
+      --deposit, --amount               Number of tokens to attach (in NEAR) to a function call  [string] [default: "0"]
+      --depositYocto                    Number of tokens to attach (in yocto NEAR) to a function call  [string] [default: null]
+      --base64                          Treat arguments as base64-encoded BLOB.  [boolean] [default: false]
+      --privateKey                      AccessKey to use in the call  [string] [default: null]
+
+ServerTransactionError: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: cannot cancel an invoice in status Released\n    at assert (build/paid-in-full.js:2229)\n    at cancel (build/paid-in-full.js:3107)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at cancel (build/paid-in-full.js:3191)\n"}}}}
+    at parseResultError (/usr/lib/node_modules/near-cli/node_modules/@near-js/utils/lib/errors/rpc_errors.js:31:29)
+    at Account.<anonymous> (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:123:56)
+    at Generator.next (<anonymous>)
+    at fulfilled (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:5:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'ActionError',
+  context: undefined,
+  index: 0,
+  kind: { index: 0, kind: { FunctionCallError: [Object] } },
+  transaction_outcome: {
+    block_hash: 'DTu4GL8QBwyCawqKC3CRE3gbDWr27kUVVNkdKMh4ALdp',
+    id: '3ceDsBa8Hvj5whZjXWrUqGw8KiY2XwfZ4f5X4JJH5yHo',
+    outcome: {
+      executor_id: 'paid-in-full-v3.testnet',
+      gas_burnt: 308128813954,
+      logs: [],
+      metadata: [Object],
+      receipt_ids: [Array],
+      status: [Object],
+      tokens_burnt: '30812881395400000000'
+    },
+    proof: [ [Object], [Object], [Object] ]
+  }
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- create inv-3002 ---
+Scheduling a call: paid-in-full-v3.testnet.create_invoice({"invoice_id":"inv-3002","job":"Over the approved sum","contractor":"crew.paid-in-full-v3.testnet","client":"paid-in-full-v3.testnet","amount_yocto":"12400000000000000000000"})
+Receipt: LLTtT7E3nsrdpAxLLNztxiiQMyDM1Pa5N6Ymy7FfjGz
+	Log [paid-in-full-v3.testnet]: invoice inv-3002 created: Over the approved sum, amount 12400000000000000000000 yocto, client paid-in-full-v3.testnet
+Transaction Id 96o27xYfF3DHL9XBuuMm9M2hF5gaor7MnwLM2xcJ1R2u
+Open the explorer for more info: https://testnet.nearblocks.io/txns/96o27xYfF3DHL9XBuuMm9M2hF5gaor7MnwLM2xcJ1R2u
+''
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- NEGATIVE: client_approve inv-3002 with 0.01 cap (below amount) (must fail) ---
+Scheduling a call: paid-in-full-v3.testnet.client_approve({"invoice_id":"inv-3002","approved_sum_yocto":"10000000000000000000000"})
+Receipt: 5H3ysvwFBSKwz1VZmUa4B1xCU55v5GfsCQeWu2FbkUnX
+	Failure [paid-in-full-v3.testnet]: Error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: approved sum must be at least the invoice amount\n    at assert (build/paid-in-full.js:2229)\n    at client_approve (build/paid-in-full.js:3067)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at client_approve (build/paid-in-full.js:3233)\n"}}}}
+near call <contractName> <methodName> [args]
+
+Call method in smart contract
+
+Options:
+      --help                            Show help  [boolean]
+      --version                         Show version number  [boolean]
+  -v, --verbose                         Prints out verbose output  [boolean] [default: false]
+      --useAccount, --accountId         Account that will execute the actions  [string] [required]
+      --signWithLedger, --useLedgerKey  Use Ledger for signing  [boolean] [default: false]
+      --ledgerPath                      HD key path  [string] [default: "44'/397'/0'/0'/1'"]
+      --networkId                       Which network to use. Supports: mainnet, testnet, custom  [string] [default: "testnet"]
+      --gas                             Max amount of gas this call can use (in gas units)  [string] [default: 30000000000000]
+      --deposit, --amount               Number of tokens to attach (in NEAR) to a function call  [string] [default: "0"]
+      --depositYocto                    Number of tokens to attach (in yocto NEAR) to a function call  [string] [default: null]
+      --base64                          Treat arguments as base64-encoded BLOB.  [boolean] [default: false]
+      --privateKey                      AccessKey to use in the call  [string] [default: null]
+
+ServerTransactionError: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: approved sum must be at least the invoice amount\n    at assert (build/paid-in-full.js:2229)\n    at client_approve (build/paid-in-full.js:3067)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at client_approve (build/paid-in-full.js:3233)\n"}}}}
+    at parseResultError (/usr/lib/node_modules/near-cli/node_modules/@near-js/utils/lib/errors/rpc_errors.js:31:29)
+    at Account.<anonymous> (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:123:56)
+    at Generator.next (<anonymous>)
+    at fulfilled (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:5:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'ActionError',
+  context: undefined,
+  index: 0,
+  kind: { index: 0, kind: { FunctionCallError: [Object] } },
+  transaction_outcome: {
+    block_hash: 'fRqKrVhAXDDvE1hQ5rgWJtRdG5Pzru64DAwmXgUoPnw',
+    id: 'AxSH6GY1VJ3sw8wRoaoea3da7Lba1snoBNLeTSJRy4dm',
+    outcome: {
+      executor_id: 'paid-in-full-v3.testnet',
+      gas_burnt: 308251790324,
+      logs: [],
+      metadata: [Object],
+      receipt_ids: [Array],
+      status: [Object],
+      tokens_burnt: '30825179032400000000'
+    },
+    proof: [ [Object], [Object], [Object] ]
+  }
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+View call: paid-in-full-v3.testnet.get_invoice({"invoice_id":"inv-3002"})
+{
+  job: 'Over the approved sum',
+  contractor: 'crew.paid-in-full-v3.testnet',
+  client: 'paid-in-full-v3.testnet',
+  amountYocto: '12400000000000000000000',
+  status: 'Created',
+  approved: false,
+  approvedSumYocto: '0'
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- client_approve inv-3002 (0.0124 cap) ---
+Scheduling a call: paid-in-full-v3.testnet.client_approve({"invoice_id":"inv-3002","approved_sum_yocto":"12400000000000000000000"})
+Receipt: A98GLs4Ujxw3mbCQy5Sjzpn3yNFbN9nu89Kt1Ayzu7Ku
+	Log [paid-in-full-v3.testnet]: invoice inv-3002 approved by client paid-in-full-v3.testnet up to 12400000000000000000000 yocto
+Transaction Id B6rXSFsuwooxbNBmXPDQ8JsKKWCe97qtLWzf2S8UKSmq
+Open the explorer for more info: https://testnet.nearblocks.io/txns/B6rXSFsuwooxbNBmXPDQ8JsKKWCe97qtLWzf2S8UKSmq
+''
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+View call: paid-in-full-v3.testnet.get_invoice({"invoice_id":"inv-3002"})
+{
+  job: 'Over the approved sum',
+  contractor: 'crew.paid-in-full-v3.testnet',
+  client: 'paid-in-full-v3.testnet',
+  amountYocto: '12400000000000000000000',
+  status: 'Created',
+  approved: true,
+  approvedSumYocto: '12400000000000000000000'
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- fund inv-3002 (0.0124) ---
+Scheduling a call: paid-in-full-v3.testnet.approve_and_fund({"invoice_id":"inv-3002"}) with attached 0.0124 NEAR
+Receipt: 6zsAFMWywUeevpt8ZW4i7cFHTjdWb5fFJVeXEyCjENRe
+	Log [paid-in-full-v3.testnet]: invoice inv-3002 approved and funded by paid-in-full-v3.testnet
+Transaction Id 6qDiNq7S5diUMh7erdoQVSB3YUXAHeBzsTo8UPhTJix
+Open the explorer for more info: https://testnet.nearblocks.io/txns/6qDiNq7S5diUMh7erdoQVSB3YUXAHeBzsTo8UPhTJix
+''
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+View call: paid-in-full-v3.testnet.get_invoice({"invoice_id":"inv-3002"})
+{
+  job: 'Over the approved sum',
+  contractor: 'crew.paid-in-full-v3.testnet',
+  client: 'paid-in-full-v3.testnet',
+  amountYocto: '12400000000000000000000',
+  status: 'Funded',
+  approved: true,
+  approvedSumYocto: '12400000000000000000000'
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- create inv-3003 ---
+Scheduling a call: paid-in-full-v3.testnet.create_invoice({"invoice_id":"inv-3003","job":"Cancelled before funding","contractor":"crew.paid-in-full-v3.testnet","client":"paid-in-full-v3.testnet","amount_yocto":"10000000000000000000000"})
+Receipt: Gukwuz3KNfvU8Do5ceLdpTA1swiS7P535CvY2RU3VTjA
+	Log [paid-in-full-v3.testnet]: invoice inv-3003 created: Cancelled before funding, amount 10000000000000000000000 yocto, client paid-in-full-v3.testnet
+Transaction Id 8Fr4uxLf8bJyvMmT3xNpR8tBvurwYHqbYCDbc8Gx7Ebk
+Open the explorer for more info: https://testnet.nearblocks.io/txns/8Fr4uxLf8bJyvMmT3xNpR8tBvurwYHqbYCDbc8Gx7Ebk
+''
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+  formattedAmount: '5.9565126583457766'
+  formattedAmount: '3.01'
+--- NEGATIVE: stranger cancel from Created (must fail) ---
+Scheduling a call: paid-in-full-v3.testnet.cancel({"invoice_id":"inv-3003"})
+Receipt: 13HeJ4w6E4XWh72jTi5DJjMx1aN79UiM4ScK5th4YSDr
+	Failure [paid-in-full-v3.testnet]: Error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: only the client who funded this invoice can cancel it\n    at assert (build/paid-in-full.js:2229)\n    at cancel (build/paid-in-full.js:3108)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at cancel (build/paid-in-full.js:3191)\n"}}}}
+near call <contractName> <methodName> [args]
+
+Call method in smart contract
+
+Options:
+      --help                            Show help  [boolean]
+      --version                         Show version number  [boolean]
+  -v, --verbose                         Prints out verbose output  [boolean] [default: false]
+      --useAccount, --accountId         Account that will execute the actions  [string] [required]
+      --signWithLedger, --useLedgerKey  Use Ledger for signing  [boolean] [default: false]
+      --ledgerPath                      HD key path  [string] [default: "44'/397'/0'/0'/1'"]
+      --networkId                       Which network to use. Supports: mainnet, testnet, custom  [string] [default: "testnet"]
+      --gas                             Max amount of gas this call can use (in gas units)  [string] [default: 30000000000000]
+      --deposit, --amount               Number of tokens to attach (in NEAR) to a function call  [string] [default: "0"]
+      --depositYocto                    Number of tokens to attach (in yocto NEAR) to a function call  [string] [default: null]
+      --base64                          Treat arguments as base64-encoded BLOB.  [boolean] [default: false]
+      --privateKey                      AccessKey to use in the call  [string] [default: null]
+
+ServerTransactionError: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: assertion failed: only the client who funded this invoice can cancel it\n    at assert (build/paid-in-full.js:2229)\n    at cancel (build/paid-in-full.js:3108)\n    at apply (native)\n    at <anonymous> (build/paid-in-full.js:2943)\n    at cancel (build/paid-in-full.js:3191)\n"}}}}
+    at parseResultError (/usr/lib/node_modules/near-cli/node_modules/@near-js/utils/lib/errors/rpc_errors.js:31:29)
+    at Account.<anonymous> (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:123:56)
+    at Generator.next (<anonymous>)
+    at fulfilled (/usr/lib/node_modules/near-cli/node_modules/@near-js/accounts/lib/account.js:5:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'ActionError',
+  context: undefined,
+  index: 0,
+  kind: { index: 0, kind: { FunctionCallError: [Object] } },
+  transaction_outcome: {
+    block_hash: '5RTcYnqW6Aw3riBhkZpDTeiXdYHx8KjxQw1cGStB8QbW',
+    id: 'Emuz6xzKSwQU8DmRb2mDfH4KB36KNXJ4c3eofPqJJJTJ',
+    outcome: {
+      executor_id: 'stranger.paid-in-full-v3.testnet',
+      gas_burnt: 309537695165,
+      logs: [],
+      metadata: [Object],
+      receipt_ids: [Array],
+      status: [Object],
+      tokens_burnt: '30953769516500000000'
+    },
+    proof: [ [Object], [Object] ]
+  }
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+--- client cancel inv-3003 from Created ---
+Scheduling a call: paid-in-full-v3.testnet.cancel({"invoice_id":"inv-3003"})
+Receipt: GuQD2c3dubsBDd4sXQFjDgnGMSqbR4Pu5rHpDHmvcF66
+	Log [paid-in-full-v3.testnet]: invoice inv-3003 cancelled (unfunded, no refund)
+Transaction Id qacUfRwnrisTfyndAuabqHV3nzihaxrkMRrYHPRfPqA
+Open the explorer for more info: https://testnet.nearblocks.io/txns/qacUfRwnrisTfyndAuabqHV3nzihaxrkMRrYHPRfPqA
+''
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+View call: paid-in-full-v3.testnet.get_invoice({"invoice_id":"inv-3003"})
+{
+  job: 'Cancelled before funding',
+  contractor: 'crew.paid-in-full-v3.testnet',
+  client: 'paid-in-full-v3.testnet',
+  amountYocto: '10000000000000000000000',
+  status: 'Cancelled',
+  approved: false,
+  approvedSumYocto: '0'
+}
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘
+  formattedAmount: '5.9554750193566306'
+  formattedAmount: '3.01'
+View call: paid-in-full-v3.testnet.invoice_ids({})
+[ 'inv-3001', 'inv-3002', 'inv-3003' ]
+┌─────────────────────────────────────────────────────────┐
+│              near-cli update check failed               │
+│           Try running with sudo or get access           │
+│          to the local update config store via           │
+│ sudo chown -R $USER:$(id -gn $USER) /home/hatch/.config │
+└─────────────────────────────────────────────────────────┘

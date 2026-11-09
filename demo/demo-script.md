@@ -13,10 +13,10 @@ Record at 1080p, browser zoom 150%, mouse slow. Narration can be AI voiceover (d
 | 0:27–0:38 | Click **"Clerk: check against approved sum"**. Red **FLAGGED** banner: *exceeds the approved contract sum by $400.00*. | "Before a dollar moves, the clerk checks the invoice against the approved contract sum — and flags it. Four hundred dollars over. This invoice cannot be paid." |
 | 0:38–0:49 | Click **"Human: approve for payment"** — refusal message appears. | "Not even by clicking approve. A flagged invoice is locked until a human resolves the overage — on paper, first." |
 | 0:49–1:00 | Corrected total field ($12,000) → click **"Human: correct invoice to this total"**. Then click **"Clerk: check against approved sum"** again — the re-check is its own visible action and turns green: *within the approved contract sum*. Click **"Human: approve for payment"** → status **APPROVED**. | "The drain job gets re-quoted separately, the invoice is corrected to the agreed twelve thousand, the clerk re-checks — clean — and now the human approves." |
-| 1:00–1:24 | Click **"Fund escrow"** — escrow **Funded**. Click **"Release payment from escrow"**. Status flips to **PAID**, escrow **Released**, crew balance $12,000, event history printed. Then click **"Show live on-chain invoices"** — the real deployed contract's live invoice state renders from the testnet RPC (inv-2001 Released, inv-2002/inv-2003 Created over the cap). | "The approved invoice is funded into escrow — and now the client releases it. Payment releases from the locally simulated escrow on near, and the crew is paid in full, exactly the approved amount. No more, no less. And the same escrow lives on near testnet — here are the real invoices on-chain, with their approval and cap." |
+| 1:00–1:24 | Click **"Fund escrow"** — escrow **Funded**. Click **"Release payment from escrow"**. Status flips to **PAID**, escrow **Released**, crew balance $12,000, event history printed. Then click **"Show live on-chain invoices"** — the real deployed contract's live invoice state renders from the testnet RPC (inv-3001 Released, inv-3002 Funded, inv-3003 Cancelled). | "The approved invoice is funded into escrow — and now the client releases it. Payment releases from the locally simulated escrow on near, and the crew is paid in full, exactly the approved amount. No more, no less. And the same escrow lives on near testnet — here are the real invoices on-chain, with their approval and cap." |
 | 1:27–1:45 | Scroll to the Intents panel, click **"Get dry quote for this invoice"**; the live NEAR → USDT quote for the full $12,000 invoice renders and stays on screen for a full 4–5 seconds. | "And with in-tent-s on near, the desk can quote cross-chain settlement live — here, a dry quote for the full twelve-thousand-dollar invoice, priced from the live one-near rate. No funds moved." |
 | 1:45–1:56 | Scroll to section 6, the wallet UI: **"Connect testnet wallet"**, the five live action buttons, the 0.01 NEAR label; the live invoice id field already suggests **inv-3007**. | "The desk also has a wallet section — connect a testnet wallet, and those same five calls run for real, on a small testnet amount. There is no wallet sign-in on camera here, so the same signed calls run from the terminal instead, with the team's testnet key." |
-| 1:56–3:27 | Terminal (xterm, green on black): `near view` invoice list (inv-3001…inv-3006), then the four signed calls on a fresh invoice **inv-3007** (0.01 NEAR) — `create_invoice` → `client_approve` (cap 0.01) → `approve_and_fund` (exactly 0.01) → `release` — each printing its transaction hash; then a follow-up terminal clip: `get_invoice` reads **Released**, and the live indexer lists all four hashes with their method names. | "A fresh invoice, inv-3007, for one hundredth of a near. The client approves it, with the cap set to the amount. Then the client funds it — exactly one hundredth of a near, no more — and releases it to the crew. Each call returns its transaction hash, on testnet, for anyone to check. And the invoice reads Released — approved, funded, and paid, for exactly the amount." |
+| 1:56–3:27 | Terminal (xterm, green on black): `near view` invoice list (inv-3001…inv-3006), then the four signed calls on a fresh invoice **inv-3007** (0.01 NEAR) — `create_invoice` → `client_approve` (cap 0.01) → `approve_and_fund` (exactly 0.01) → `release` — each printing its transaction hash; then a follow-up terminal clip: `get_invoice` reads **Released**, and the live indexer lists all four hashes with their method names. | "A fresh invoice, inv-3007, for one hundredth of a near. The client approves it, with the cap set to the amount. Then the client funds it — exactly one hundredth of a near, no more — and releases it to the crew. Each call returns its transaction hash, on testnet, for anyone to check. And the invoice reads Released — approved, then funded, then paid, for exactly the amount." |
 | 3:27–3:36 | Back on the desk, click **"Show live on-chain invoices"** again — the table now has a seventh row: **inv-3007 RELEASED**. | *(seg8 tail / silence while the table is read)* |
 | 3:36–3:47 | End frame: repo URL + "Built at NEAR Hackathon" + v3 contract + deploy tx + live release tx. | "This is Paid in Full: the agent prepares and checks. The human decides. The blockchain provides the foundation. Built at NEAR Hackathon." |
 
@@ -32,8 +32,12 @@ Narration as recorded: seg0 opens "This is Paid in Full."; "NEAR" is spelled
 reworded line transcribes "intents" in both Whisper base and small (verified
 from the final mix). seg7b opens "This is Paid in Full — …" so "Paid" sits off
 the onset (v3's closing rendered as "tayden full"). The cold-open line is
-seg0, in the storyboard above — narration and script now match. Exact TTS
-render texts per segment: `demo/audio/render-texts-v5.md`.
+seg0, in the storyboard above — narration and script now match. One
+exception (F9): the 1:56–3:27 narration in the table above now reads
+"approved, then funded, then paid" — the shipped v5 audio says
+"approved, funded, and paid". The states are sequential, not
+simultaneous; the audio is approved as-is and was not re-recorded.
+Exact TTS render texts per segment: `demo/audio/render-texts-v5.md`.
 
 ## Screenshots to capture (for the X post if video is trimmed, and for the repo)
 
@@ -44,7 +48,7 @@ render texts per segment: `demo/audio/render-texts-v5.md`.
 5. `shot-5-approved.png` — corrected invoice, green re-check, status APPROVED with the approver's name.
 6. `shot-6-funded.png` — escrow Funded, $12,000 held in escrow.
 7. `shot-6-paid.png` — PAID status, escrow Released, crew balance, and the full event history.
-8. `shot-6-onchain.png` — the live on-chain invoice table from the testnet RPC (inv-2001 Released, inv-2002/inv-2003 Created over the cap).
+8. `shot-6-onchain.png` — the live on-chain invoice table from the testnet RPC (inv-3001 Released, inv-3002 Funded, inv-3003 Cancelled).
 9. `shot-7-quote.png` — the live NEAR Intents dry quote JSON.
 
 ## Recording checklist

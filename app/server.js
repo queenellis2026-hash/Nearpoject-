@@ -25,7 +25,7 @@ const { EscrowLedger } = require('./ledger');
 const { dryQuote } = require('../intents/quote');
 const { fetchOnchainInvoicesCached, startOnchainRefresh } = require('./onchain');
 
-// The deployed contract account (fresh v2 deployment — see DEPLOY.md).
+// The deployed contract account (fresh v3 deployment — see DEPLOY.md).
 // Override with CONTRACT_ACCOUNT=... to point the on-chain panel at a
 // different deployment.
 const CONTRACT_ACCOUNT = process.env.CONTRACT_ACCOUNT || 'paid-in-full-v3.testnet';
@@ -89,17 +89,46 @@ const routes = {
   },
 
   // Human corrects a flagged invoice downward.
+  //
+  // Atomic, mirroring /api/approve: read-only pre-checks first (so a
+  // refusal carries the clerk's instructive message and touches neither
+  // layer), then the LEDGER void first, then the clerk mutation inside a
+  // try with snapshot rollback. Correcting a merely-approved invoice is
+  // allowed — the correction voids that approval (the F1 approve ->
+  // correct -> re-approve flow). Correcting a PAID invoice is refused by
+  // the pre-check; correcting a FUNDED one is refused by the ledger void,
+  // which throws for a Funded escrow before the clerk mutates. Either
+  // way a failed correction leaves NO mutation persisted in either layer:
+  // before this fix the clerk rewrote the paid invoice as 'quoted' at
+  // the lowered total and only then did the ledger void throw.
   'POST /api/correct': async (req, res) => {
     const { invoiceId, correctedTotalCents, correctedBy, note } = await readBody(req);
     const inv = mustGet(invoiceId);
-    clerk.correctInvoiceTotal(inv, correctedTotalCents, correctedBy, note);
-    // The correction voids the clerk approval; void the ledger approval
-    // in the same request, or the stale ledger approval (old cap) would
-    // survive and block — or wrongly permit — the re-approval.
+    if (!correctedBy) throw new Error('a correction needs a human (correctedBy)');
+    if (inv.status !== 'quoted' && inv.status !== 'approved') {
+      throw new Error(`cannot correct an invoice in status "${inv.status}" — the invoice is already ${inv.status}; only a new invoice can change it`);
+    }
+    const target = Math.round(Number(correctedTotalCents));
+    if (!Number.isFinite(target)) throw new Error('a correction needs a numeric correctedTotalCents');
+    if (target - inv.totalCents >= 0) throw new Error('a correction must lower the total; use a change order to raise it');
+    // Snapshot both layers for rollback, then LEDGER FIRST.
+    const snapshot = snapshotInvoice(inv);
+    const escrow = ledger.escrowOf(inv.id);
+    const escrowApproval = escrow ? { approved: escrow.approved, approvedSumCents: escrow.approvedSumCents } : null;
     ledger.voidApproval(inv.id);
-    syncEscrowAmount(inv);
-    const check = clerk.checkAgainstApproved(inv);
-    json(res, 200, { invoice: inv, check });
+    try {
+      clerk.correctInvoiceTotal(inv, correctedTotalCents, correctedBy, note);
+      syncEscrowAmount(inv);
+      const check = clerk.checkAgainstApproved(inv);
+      json(res, 200, { invoice: inv, check });
+    } catch (e) {
+      restoreInvoice(inv, snapshot);
+      if (escrow && escrowApproval) {
+        escrow.approved = escrowApproval.approved;
+        escrow.approvedSumCents = escrowApproval.approvedSumCents;
+      }
+      throw e;
+    }
   },
 
   // Human approves a change order for a SPECIFIC invoice, and only BEFORE
@@ -111,6 +140,13 @@ const routes = {
   // order after approval is rejected (clerk.approveChangeOrder throws)
   // and only a new invoice can change the approved sum. Requires an
   // invoice id and a named human.
+  //
+  // Atomic, mirroring /api/correct: read-only pre-checks first, then the
+  // LEDGER void first, then the clerk mutation inside a try with snapshot
+  // rollback. The clerk guard already refuses non-'quoted' invoices
+  // (approved, paid) before mutating; the ledger void is the second lock
+  // for a Funded/Released escrow, and the snapshot is the third — a
+  // failed change order leaves NO mutation persisted in either layer.
   'POST /api/change-order': async (req, res) => {
     const { invoiceId, changeOrder, approvedBy } = await readBody(req);
     if (!invoiceId) throw new Error('a change order needs an invoiceId');
@@ -119,21 +155,41 @@ const routes = {
       throw new Error('a change order needs an amountCents');
     }
     const inv = mustGet(invoiceId);
-    clerk.approveChangeOrder(inv, changeOrder, approvedBy);
+    if (inv.status !== 'quoted') {
+      const why = inv.status === 'approved'
+        ? 'the invoice is already approved'
+        : inv.status === 'paid'
+          ? 'the invoice is already paid'
+          : `the invoice is in status "${inv.status}"`;
+      throw new Error(`cannot approve a change order: ${why} — the approved sum is frozen; only a new invoice can change it`);
+    }
+    const snapshot = snapshotInvoice(inv);
+    const escrow = ledger.escrowOf(inv.id);
+    const escrowApproval = escrow ? { approved: escrow.approved, approvedSumCents: escrow.approvedSumCents } : null;
     // A pre-approval change order voids any prior clerk approval (the
     // clerk resets the invoice to quoted); void the ledger approval in
     // the same request so the next approval sets the cap from the NEW
     // approved sum instead of funding against the old one. A change order
-    // on an already-approved invoice is rejected by the clerk above, so
-    // this never re-opens a frozen cap.
+    // on an already-approved invoice is rejected by the pre-check above,
+    // so this never re-opens a frozen cap.
     ledger.voidApproval(inv.id);
-    const check = clerk.checkAgainstApproved(inv);
-    json(res, 200, {
-      invoice: inv,
-      check,
-      approvedContractSumCents: inv.approvedSumCents,
-      note: `change order approved by ${approvedBy} for ${invoiceId}`,
-    });
+    try {
+      clerk.approveChangeOrder(inv, changeOrder, approvedBy);
+      const check = clerk.checkAgainstApproved(inv);
+      json(res, 200, {
+        invoice: inv,
+        check,
+        approvedContractSumCents: inv.approvedSumCents,
+        note: `change order approved by ${approvedBy} for ${invoiceId}`,
+      });
+    } catch (e) {
+      restoreInvoice(inv, snapshot);
+      if (escrow && escrowApproval) {
+        escrow.approved = escrowApproval.approved;
+        escrow.approvedSumCents = escrowApproval.approvedSumCents;
+      }
+      throw e;
+    }
   },
 
   // THE HUMAN GATE: only a human approval moves quoted -> approved. This
@@ -271,6 +327,19 @@ const routes = {
 function syncEscrowAmount(inv) {
   const e = ledger.escrowOf(inv.id);
   if (e && e.status === 'Created') e.amountCents = inv.totalCents;
+}
+
+// Deep snapshot of a clerk invoice for rollback. The invoices Map holds
+// the invoice object by reference, so restoring in place (delete every
+// key, re-assign the snapshot's) puts the stored invoice back exactly
+// as it was — a failed route leaves no clerk mutation persisted.
+function snapshotInvoice(inv) {
+  return JSON.parse(JSON.stringify(inv));
+}
+
+function restoreInvoice(inv, snapshot) {
+  for (const k of Object.keys(inv)) delete inv[k];
+  Object.assign(inv, snapshot);
 }
 
 function mustGet(id) {
