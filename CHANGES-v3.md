@@ -42,19 +42,10 @@
   Intents) are a separate worker's lane and are NOT part of this change.
 
 ## The video
-- No new video cut in this pass. The v4 video still points at the v2
-  account; a v5 cut pointing at v3 is open work, not done here.
-- Open item carried from v2: the narration pronunciation fixes were
-  applied by rewording and respelling but were NOT verified by ear (no
-  speech-to-text available where the video was produced). Please listen
-  for mispronunciations.
+- `demo/paid-in-full-demo.mp4` is v5 (226.8 s, 1920x1080): the live wallet section is filmed (near-cli on camera, inv-3007 Released), the Intents segment was re-rendered ("near-intense" fixed — re-transcribed with faster-whisper, "intents" in base + small), and the end card shows the repo URL on one line. Section 5 re-filmed against the v3 contract. v4 preserved as `demo/paid-in-full-demo-v4.mp4`.
+- Narration pronunciation is now verified by ear (faster-whisper transcription of the final mix): cold open clean ("Paid", no "Tayden full"), "NEAR" clean throughout, "Intents" clean in the re-rendered segment. "drain rerout" at ~19–27 s is a Whisper-base transcription artifact (small hears "reroute") — not a TTS defect.
 
 ## Tests
-- Sandbox contract test (`contract/tests-sandbox/run.mjs`): **20/20
-  passed on the Hetzner server** (contract worker's run, per the build
-  brief for this pass).
-- Unit tests (`tests/clerk-and-ledger.test.js`): count is the app
-  worker's number — that worker owns the tests and was still editing them
-  during this run. (`tests/clerk-and-ledger.test.js` showed 19 `test(`
-  blocks when read mid-run; do not take that as the final count — confirm
-  with the app worker's report.)
+- Sandbox contract test (`contract/tests-sandbox/run.mjs`): **20/20 passed on the Hetzner server** (contract worker's run).
+- Unit tests (`npm test`): **20/20 passed** — 19 in `tests/clerk-and-ledger.test.js` plus 1 server-level test (`tests/server-approve-correct-reapprove.test.js`, approve → correct → re-approve over HTTP).
+- Wallet call builders (`app/public/wallet.js`): **11/11 passed** (worker's suite, re-run independently); the Node on-chain proof drove the same call shapes (inv-3004 Released, inv-3005 cancel-from-Created, inv-3006 low-cap reject).
