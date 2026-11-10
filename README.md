@@ -102,3 +102,7 @@ Note: in restricted sandboxes the near-sdk-js postinstall can fail when `tar` ca
 ## License
 
 MIT — see `LICENSE`.
+
+---
+
+Live: [lamplightpay.com](https://lamplightpay.com) — escrow for agent work on BOT Chain mainnet.
